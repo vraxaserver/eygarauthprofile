@@ -4,7 +4,7 @@ from .views import (
     RegisterView, ActivateView, MyTokenObtainPairView,
     LogoutView, MeView, MyProfileView, ChangePasswordView
 )
-from rest_framework_simplejwt.views import TokenRefreshView
+from rest_framework_simplejwt.views import TokenRefreshView, TokenVerifyView
 
 app_name = "accounts"
 
@@ -13,6 +13,7 @@ urlpatterns = [
     path("activate/", ActivateView.as_view(), name="activate"),
     path("login/", MyTokenObtainPairView.as_view(), name="token"),
     path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    path("token/verify/", TokenVerifyView.as_view(), name='token_verify'),
     path("logout/", LogoutView.as_view(), name="logout"),
     path("me/", MeView.as_view(), name="me"),
     path("profile/", MyProfileView.as_view(), name="auth_profile"),

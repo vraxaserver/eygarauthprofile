@@ -3,12 +3,11 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.core.mail import send_mail
-from django.shortcuts import redirect
 from rest_framework import generics, status, permissions, serializers
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
-from .serializers import RegisterSerializer, UserSerializer, ChangePasswordSerializer
+from .serializers import RegisterSerializer, UserSerializer, ChangePasswordSerializer, UserProfileSerializer
 from .tokens import make_token, parse_token
 
 from rest_framework_simplejwt.views import TokenObtainPairView
@@ -88,7 +87,7 @@ class MeView(generics.RetrieveUpdateAPIView):
 
 
 class MyProfileView(generics.RetrieveUpdateAPIView):
-    serializer_class = UserSerializer
+    serializer_class = UserProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_object(self):

@@ -41,7 +41,7 @@ class ProfileStatusHistoryInline(admin.TabularInline):
 @admin.register(EygarHost)
 class EygarHostAdmin(admin.ModelAdmin):
     list_display = [
-        'user', 'status', 'current_step', 'completion_percentage_display',
+        'id', 'user', 'status', 'current_step', 'completion_percentage_display',
         'created_at', 'submitted_at', 'reviewed_at', 'actions_display'
     ]
     list_filter = [

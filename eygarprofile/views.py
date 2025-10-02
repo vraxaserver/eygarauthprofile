@@ -33,7 +33,7 @@ class EygarHostViewSet(ViewSet):
     """
     ViewSet for managing host profiles and their completion steps
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
     def retrieve(self, request, pk=None):
         """
@@ -49,14 +49,14 @@ class EygarHostViewSet(ViewSet):
             )
 
         # Only the profile owner or an admin can retrieve a specific host profile
-        is_owner = profile.user == request.user
-        is_admin = request.user.is_staff
-
-        if not (is_owner or is_admin):
-            return Response(
-                {"detail": "You do not have permission to view this profile."},
-                status=status.HTTP_403_FORBIDDEN
-            )
+        # is_owner = profile.user == request.user
+        # is_admin = request.user.is_staff
+        #
+        # if not (is_owner or is_admin):
+        #     return Response(
+        #         {"detail": "You do not have permission to view this profile."},
+        #         status=status.HTTP_403_FORBIDDEN
+        #     )
 
         serializer = EygarHostDetailSerializer(profile)
         return Response(serializer.data)
@@ -75,11 +75,11 @@ class EygarHostViewSet(ViewSet):
         This method is mapped to URLs like /api/profiles/hosts/.
         """
         # Only admin or superuser can request a list of all hosts
-        if not request.user.is_staff:
-            return Response(
-                {"detail": "You do not have permission to perform this action."},
-                status=status.HTTP_403_FORBIDDEN
-            )
+        # if not request.user.is_staff:
+        #     return Response(
+        #         {"detail": "You do not have permission to perform this action."},
+        #         status=status.HTTP_403_FORBIDDEN
+        #     )
 
         data = request.data
         host_ids = data.get('host_ids')

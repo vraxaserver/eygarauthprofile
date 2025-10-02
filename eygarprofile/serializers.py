@@ -199,6 +199,7 @@ class EygarHostDetailSerializer(serializers.ModelSerializer):
         return {
             'id': obj.user.id,
             'username': obj.user.username,
+            'avatar': obj.user.avatar.url if obj.user.avatar else None,
             'email': obj.user.email,
             'first_name': obj.user.first_name,
             'last_name': obj.user.last_name,
@@ -236,4 +237,33 @@ class AdminReviewSerializer(serializers.ModelSerializer):
         if value not in allowed_statuses:
             raise serializers.ValidationError("Invalid status for review.")
         return value
-    
+
+
+class EygarHostProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EygarHost
+        fields = '__all__'
+
+# class EygarVendorSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = EygarVendor
+#         fields = '__all__'
+
+class EygarProfileSerializer(serializers.ModelSerializer):
+    host_profile = EygarHostProfileSerializer(source='eygar_host', read_only=True)
+    # vendor_profile = EygarVendorSerializer(source='eygar_vendor', read_only=True)
+
+    class Meta:
+        model = User
+        fields = [
+            'id',
+            'email',
+            'avatar',
+            'first_name',
+            'last_name',
+            'is_email_verified',
+            'created_at',
+            'updated_at',
+            'host_profile'
+            # 'vendor_profile'
+        ]

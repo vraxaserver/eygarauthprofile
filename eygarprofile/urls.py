@@ -4,14 +4,18 @@ from .views import (
     EygarHostViewSet, 
     AdminReviewViewSet,
     MobileVerificationView,
-    VerifyMobileCodeView
+    VerifyMobileCodeView,
+    EygarProfileViewSet
 )
 
 app_name = 'eygarprofile'
 
 # Create router for viewsets
 router = DefaultRouter()
-router.register('host', EygarHostViewSet, basename='EygarHost')
+router.register('hosts', EygarHostViewSet, basename='eygarhost')
+router.register('', EygarProfileViewSet, basename='eygarprofile')
+
+# router.register('vendors', EygarVendorViewSet, basename='eygarvendor')
 router.register('admin/reviews', AdminReviewViewSet, basename='admin-review')
 
 urlpatterns = [

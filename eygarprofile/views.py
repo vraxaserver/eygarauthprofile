@@ -1,15 +1,18 @@
 from rest_framework import status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.viewsets import ViewSet
+from rest_framework.viewsets import ViewSet, ReadOnlyModelViewSet
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
+from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
 from django.core.mail import send_mail
 from django.conf import settings
 import random
 import string
+
+User = get_user_model()
 
 from .models import (
     EygarHost, BusinessProfile, IdentityVerification,
@@ -20,12 +23,10 @@ from .serializers import (
     BusinessProfileSerializer, IdentityVerificationSerializer,
     ContactDetailsSerializer, ReviewSubmissionSerializer,
     MobileVerificationSerializer, VerifyMobileCodeSerializer,
-    AdminReviewSerializer
+    AdminReviewSerializer, EygarProfileSerializer
 )
 from .permissions import IsOwnerOrReadOnly, IsAdminOrModerator
 from .utils import send_sms_verification, verify_identity_document
-
-import pdb;
 
 
 class EygarHostViewSet(ViewSet):
@@ -33,6 +34,32 @@ class EygarHostViewSet(ViewSet):
     ViewSet for managing host profiles and their completion steps
     """
     permission_classes = [permissions.IsAuthenticated]
+
+    def retrieve(self, request, pk=None):
+        """
+        Handles GET requests to retrieve a single host profile by its primary key (ID).
+        This method is automatically mapped to URLs like /api/profiles/hosts/{pk}/.
+        """
+        try:
+            profile = EygarHost.objects.get(id=pk)
+        except EygarHost.DoesNotExist:
+            return Response(
+                {"error": "Host not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Only the profile owner or an admin can retrieve a specific host profile
+        is_owner = profile.user == request.user
+        is_admin = request.user.is_staff
+
+        if not (is_owner or is_admin):
+            return Response(
+                {"detail": "You do not have permission to view this profile."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        serializer = EygarHostDetailSerializer(profile)
+        return Response(serializer.data)
 
     def get_eygar_host(self):
         """Get or create host profile for current user"""
@@ -42,15 +69,48 @@ class EygarHostViewSet(ViewSet):
         )
         return profile
 
-    def list(self, request):
-        """Get current user's host profile"""
+    def list(self, request, *args, **kwargs):
+        """
+        Get list of all host profiles.
+        This method is mapped to URLs like /api/profiles/hosts/.
+        """
+        # Only admin or superuser can request a list of all hosts
+        if not request.user.is_staff:
+            return Response(
+                {"detail": "You do not have permission to perform this action."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        data = request.data
+        host_ids = data.get('host_ids')
         try:
-            profile = self.get_eygar_host()
-            serializer = EygarHostDetailSerializer(profile)
-            return Response(serializer.data)
+            if host_ids:
+                hosts = EygarHost.objects.filter(id__in=host_ids)
+            else:
+                hosts = EygarHost.objects.all()
+
+            serializer = EygarHostDetailSerializer(hosts, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
         except Exception as e:
             return Response(
-                {'error': 'Failed to retrieve host profile'},
+                {'error': f'Failed to retrieve host profiles: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=False, methods=['get'], url_path='my')
+    def my_profile(self, request):
+        """
+        Returns the host profile for the currently authenticated user.
+        This method is mapped to the URL: /api/profiles/hosts/my/
+        """
+        try:
+            # Use the existing helper method to get the user's profile
+            profile = self.get_eygar_host()
+            serializer = EygarHostDetailSerializer(profile)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to retrieve your host profile: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -521,3 +581,28 @@ class AdminReviewViewSet(ViewSet):
             [profile.user.email],
             fail_silently=True,
         )
+
+
+class EygarProfileViewSet(ReadOnlyModelViewSet):
+    """
+    A viewset that provides a single endpoint to retrieve the
+    authenticated user's combined profile (User, EygarHost, EygarVendor).
+    """
+    serializer_class = EygarProfileSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        """
+        This view should return a list containing only
+        the authenticated user.
+        """
+        return User.objects.filter(pk=self.request.user.pk)
+
+    def list(self, request, *args, **kwargs):
+        """
+        Custom list action to return a single object instead of a list.
+        """
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset.first())
+        return Response(serializer.data)
+

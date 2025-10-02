@@ -49,9 +49,9 @@ class EygarHostAdmin(admin.ModelAdmin):
         'identity_verification_completed', 'contact_details_completed',
         'review_submission_completed', 'created_at'
     ]
-    search_fields = ['user__username', 'user__email', 'user__first_name', 'user__last_name']
+    search_fields = ['user__email', 'user__first_name', 'user__last_name']
     readonly_fields = [
-        'id', 'completion_percentage', 'created_at', 'updated_at',
+        'id', 'completion_percentage_display', 'created_at', 'updated_at', # Use the display method here too
         'submitted_at', 'reviewed_at'
     ]
 
@@ -63,7 +63,7 @@ class EygarHostAdmin(admin.ModelAdmin):
             'fields': (
                 'business_profile_completed', 'identity_verification_completed',
                 'contact_details_completed', 'review_submission_completed',
-                'completion_percentage'
+                'completion_percentage_display' # Use the display method for consistency
             )
         }),
         ('Review Information', {
@@ -75,13 +75,14 @@ class EygarHostAdmin(admin.ModelAdmin):
         })
     )
 
-    inlines = [
-        BusinessProfileInline,
-        IdentityVerificationInline,
-        ContactDetailsInline,
-        ReviewSubmissionInline,
-        ProfileStatusHistoryInline
-    ]
+    # Assuming these inlines are defined in your project
+    # inlines = [
+    #     BusinessProfileInline,
+    #     IdentityVerificationInline,
+    #     ContactDetailsInline,
+    #     ReviewSubmissionInline,
+    #     ProfileStatusHistoryInline
+    # ]
 
     actions = ['approve_profiles', 'reject_profiles', 'mark_pending']
 
@@ -94,70 +95,89 @@ class EygarHostAdmin(admin.ModelAdmin):
         else:
             color = 'red'
 
-        # Ensure percentage is a float before formatting
-        return_str = f'<span style="color: {color};">{percentage}%</span>'
-        return return_str
+        # --- FIX: Use format_html to mark the output as safe HTML ---
+        return format_html(
+            '<span style="font-weight: bold; color: {};">{}%</span>',
+            color,
+            f"{percentage:.1f}" # Format to one decimal place for consistency
+        )
 
     completion_percentage_display.short_description = 'Completion'
-    completion_percentage_display.admin_order_field = 'completion_percentage'  # Allows sorting
+    # Note: admin_order_field cannot be used on a property that relies on multiple fields.
+    # To make this sortable, you'd need to use a queryset annotation.
+    # completion_percentage_display.admin_order_field = 'completion_percentage'
 
     def actions_display(self, obj):
         if obj.status == 'submitted':
-            # Construct the URL for the change view of the current object
             change_url = reverse('admin:%s_%s_change' % (obj._meta.app_label, obj._meta.model_name), args=[obj.pk])
             return format_html(
                 '<a class="button" href="{}">Review</a>',
                 change_url
             )
-        return '-'
+        return '—' # Use an em dash for better visual alignment
 
     actions_display.short_description = 'Actions'
 
+    # --- BUG FIX in Admin Actions ---
+
     def approve_profiles(self, request, queryset):
-        # Using bulk update for status and reviewer
-        updated = queryset.update(status='approved', reviewer=request.user)
-        self.message_user(request, f'{updated} profiles approved successfully.')
-        # Add history entry for each approved profile
-        for host in queryset:
-            ProfileStatusHistory.objects.create(
+        # First, prepare history objects by capturing the CURRENT state
+        history_entries = [
+            ProfileStatusHistory(
                 eygar_host=host,
-                old_status=host.status,  # This would be 'submitted' before update
+                old_status=host.status,
                 new_status='approved',
                 changed_by=request.user,
-                change_reason='Approved by admin action'
+                change_reason='Approved via admin bulk action'
             )
+            for host in queryset
+        ]
+        
+        # Then, perform the bulk update
+        updated_count = queryset.update(status='approved', reviewer=request.user, reviewed_at=timezone.now())
+        
+        # Finally, create the history records
+        ProfileStatusHistory.objects.bulk_create(history_entries)
+        
+        self.message_user(request, f'{updated_count} profiles approved successfully.')
 
     approve_profiles.short_description = 'Approve selected profiles'
 
     def reject_profiles(self, request, queryset):
-        # Using bulk update for status and reviewer
-        updated = queryset.update(status='rejected', reviewer=request.user)
-        self.message_user(request, f'{updated} profiles rejected.')
-        # Add history entry for each rejected profile
-        for host in queryset:
-            ProfileStatusHistory.objects.create(
+        history_entries = [
+            ProfileStatusHistory(
                 eygar_host=host,
-                old_status=host.status,  # This would be 'submitted' before update
+                old_status=host.status,
                 new_status='rejected',
                 changed_by=request.user,
-                change_reason='Rejected by admin action'
+                change_reason='Rejected via admin bulk action'
             )
+            for host in queryset
+        ]
+        
+        updated_count = queryset.update(status='rejected', reviewer=request.user, reviewed_at=timezone.now())
+        ProfileStatusHistory.objects.bulk_create(history_entries)
+        
+        self.message_user(request, f'{updated_count} profiles rejected.')
 
     reject_profiles.short_description = 'Reject selected profiles'
 
     def mark_pending(self, request, queryset):
-        # Using bulk update for status
-        updated = queryset.update(status='pending')
-        self.message_user(request, f'{updated} profiles marked as pending.')
-        # Add history entry for each marked as pending profile
-        for host in queryset:
-            ProfileStatusHistory.objects.create(
+        history_entries = [
+            ProfileStatusHistory(
                 eygar_host=host,
-                old_status=host.status,  # This would be the previous status
+                old_status=host.status,
                 new_status='pending',
-                changed_by=request.user,  # The user who performed the action
-                change_reason='Marked as pending by admin action'
+                changed_by=request.user,
+                change_reason='Marked as pending via admin bulk action'
             )
+            for host in queryset
+        ]
+        
+        updated_count = queryset.update(status='pending')
+        ProfileStatusHistory.objects.bulk_create(history_entries)
+        
+        self.message_user(request, f'{updated_count} profiles marked as pending.')
 
     mark_pending.short_description = 'Mark as pending'
 

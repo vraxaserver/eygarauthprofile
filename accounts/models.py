@@ -11,7 +11,6 @@ class CustomUserManager(BaseUserManager):
         extra_fields.setdefault("username", email)  # to satisfy AbstractUser.username
         user = self.model(email=email, **extra_fields)
         user.set_password(password)
-        # user.is_active = False  # require email verification
         user.save(using=self._db)
         return user
 
@@ -35,8 +34,8 @@ class User(AbstractUser):
     email = models.EmailField(unique=True, null=True, blank=True)
     avatar = models.ImageField(upload_to="avatars/", null=True, blank=True)
     is_email_verified = models.BooleanField(default=False)
-    # is_host_verified = models.BooleanField(default=False)
-    # is_vendor_verified = models.BooleanField(default=False)
+    is_host_verified = models.BooleanField(default=False)
+    is_vendor_verified = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

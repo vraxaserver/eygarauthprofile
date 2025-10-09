@@ -1,0 +1,70 @@
+# Dockerfile.alpine (fix: build wheels for deps)
+FROM python:3.12-alpine AS builder
+
+ENV PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+WORKDIR /build
+
+RUN apk add --no-cache \
+      build-base \
+      postgresql-dev \
+      libffi-dev \
+      openssl-dev \
+      ca-certificates \
+      bash \
+      pkgconfig \
+      linux-headers
+
+COPY requirements.txt ./
+
+# Build wheels for top-level + transitive dependencies (remove --no-deps)
+RUN python -m pip install --upgrade pip setuptools wheel \
+ && mkdir -p /wheels \
+ && pip wheel -r requirements.txt --wheel-dir /wheels \
+ && ls -lah /wheels
+
+COPY . /build/app
+
+# ---------- runtime ----------
+FROM python:3.12-alpine AS runtime
+
+ENV PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    DJANGO_SETTINGS_MODULE=conf.settings \
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:$PATH"
+
+WORKDIR /app
+
+RUN apk add --no-cache \
+      postgresql-libs \
+      ca-certificates \
+      curl \
+      tzdata \
+    && update-ca-certificates
+
+ARG APP_USER=appuser
+ARG APP_UID=1000
+RUN addgroup -g ${APP_UID} ${APP_USER} \
+ && adduser -D -u ${APP_UID} -G ${APP_USER} ${APP_USER}
+
+COPY --from=builder /wheels /wheels
+COPY --from=builder --chown=${APP_USER}:${APP_USER} /build/app /app
+COPY --chown=${APP_USER}:${APP_USER} .env /app/.env
+
+RUN python -m venv /opt/venv \
+ && /opt/venv/bin/python -m pip install --upgrade pip setuptools wheel \
+ && /opt/venv/bin/pip install --no-index --find-links /wheels -r /app/requirements.txt --no-cache-dir \
+ && rm -rf /wheels /root/.cache/pip
+
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
+ && chown -R ${APP_USER}:${APP_USER} /app
+
+USER root
+EXPOSE 8000
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+CMD ["gunicorn", "conf.asgi:application", "-w", "3", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:8000", "--log-level", "info"]

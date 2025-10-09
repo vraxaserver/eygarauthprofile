@@ -1,0 +1,98 @@
+[
+{
+    "model": "accounts.user",
+    "pk": "19ce49d1-49e2-4a22-83e3-57a0c983262a",
+    "fields": {
+        "password": "pbkdf2_sha256$1000000$iarGiOYsSyRnE1tcbCQboC$GlNZbN/BcwGvWBGAIWc2SbJ1LG70TO1f7PcXRuS7Qe8=",
+        "last_login": null,
+        "is_superuser": false,
+        "first_name": "Amanur",
+        "last_name": "Rashid",
+        "is_staff": false,
+        "is_active": true,
+        "date_joined": "2025-10-09T09:39:25.120Z",
+        "email": "rafin@gmail.com",
+        "avatar": "",
+        "is_email_verified": true,
+        "is_host_verified": false,
+        "is_vendor_verified": false,
+        "created_at": "2025-10-09T09:39:25.294Z",
+        "updated_at": "2025-10-09T09:50:30.570Z",
+        "username": "rafin@gmail.com",
+        "groups": [],
+        "user_permissions": []
+    }
+},
+{
+    "model": "accounts.user",
+    "pk": "6ddccb1a-afc4-49c1-bb08-ce48b78b9f42",
+    "fields": {
+        "password": "pbkdf2_sha256$1000000$EZe7Cq8rB8KXZ5k1GIEirY$ZCTILtXFm1zxwlNgAOUyAuCjT/bZdIcmsNvSmBmPhWQ=",
+        "last_login": null,
+        "is_superuser": false,
+        "first_name": "Alayna",
+        "last_name": "Rashid",
+        "is_staff": false,
+        "is_active": true,
+        "date_joined": "2025-10-09T09:38:42.338Z",
+        "email": "alayna@gmail.com",
+        "avatar": "",
+        "is_email_verified": true,
+        "is_host_verified": false,
+        "is_vendor_verified": false,
+        "created_at": "2025-10-09T09:38:42.510Z",
+        "updated_at": "2025-10-09T09:51:59.123Z",
+        "username": "alayna@gmail.com",
+        "groups": [],
+        "user_permissions": []
+    }
+},
+{
+    "model": "accounts.user",
+    "pk": "a144292b-96e3-4645-86f1-dc24fcec80d2",
+    "fields": {
+        "password": "pbkdf2_sha256$1000000$y5JUoDZDa6OkjCtFaqSUjI$3T+Iea5fkFvrypxiiVq3r4A42R1ItGxjzC+WsAFeySE=",
+        "last_login": null,
+        "is_superuser": false,
+        "first_name": "Md Irfan",
+        "last_name": "Rashid",
+        "is_staff": false,
+        "is_active": true,
+        "date_joined": "2025-10-09T09:39:01.442Z",
+        "email": "irfan@gmail.com",
+        "avatar": "",
+        "is_email_verified": true,
+        "is_host_verified": false,
+        "is_vendor_verified": false,
+        "created_at": "2025-10-09T09:39:01.607Z",
+        "updated_at": "2025-10-09T09:51:22.765Z",
+        "username": "irfan@gmail.com",
+        "groups": [],
+        "user_permissions": []
+    }
+},
+{
+    "model": "accounts.user",
+    "pk": "e118706f-2692-4904-a196-4bb6d796202d",
+    "fields": {
+        "password": "pbkdf2_sha256$1000000$3q9dREjyxgaCCfHxWWcFUN$uhfw0wtwRwAnhbcu2z6GWS99HGth3II2MBwikI9ga0Y=",
+        "last_login": "2025-10-09T10:04:49.693Z",
+        "is_superuser": true,
+        "first_name": "",
+        "last_name": "",
+        "is_staff": true,
+        "is_active": true,
+        "date_joined": "2025-10-09T10:04:45.582Z",
+        "email": "admin@gmail.com",
+        "avatar": "",
+        "is_email_verified": true,
+        "is_host_verified": false,
+        "is_vendor_verified": false,
+        "created_at": "2025-10-09T10:04:45.900Z",
+        "updated_at": "2025-10-09T10:04:45.900Z",
+        "username": "admin@gmail.com",
+        "groups": [],
+        "user_permissions": []
+    }
+}
+]

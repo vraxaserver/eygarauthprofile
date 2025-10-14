@@ -47,6 +47,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "id",
             "email",
             "username",
+            "first_name",
+            "last_name",
             "avatar_url",
             "is_email_verified",
             "is_staff",

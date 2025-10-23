@@ -35,7 +35,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware', 
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -159,9 +159,9 @@ SIMPLE_JWT = {
 
 # CORS Configuration
 CORS_ALLOWED_ORIGINS = [
+    "https://dev.eygar.com",
     "http://localhost:3000",  # Next.js default
     "http://127.0.0.1:3000",
-    os.getenv('FRONTEND_URL', default='http://localhost:3000'),
 ]
 
 CORS_ALLOW_CREDENTIALS = True

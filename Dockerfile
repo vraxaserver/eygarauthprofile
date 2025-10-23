@@ -72,7 +72,7 @@ USER root
 EXPOSE 8000
 STOPSIGNAL SIGTERM
 
-ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/docker-entrypoint.sh"]
+# ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/docker-entrypoint.sh"]
 
 # Gunicorn serves via Whitenoise (no need for nginx if using Whitenoise)
 CMD ["gunicorn", "conf.asgi:application", "-w", "3", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:8000", "--log-level", "info"]

@@ -78,7 +78,7 @@ class LogoutView(APIView):
         return Response(status=204)
 
 
-class MeView(generics.RetrieveUpdateAPIView):
+class MyView(generics.RetrieveUpdateAPIView):
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -107,4 +107,3 @@ class ChangePasswordView(APIView):
             user.save()
             return Response({"detail": "Password changed"})
         return Response(serializer.errors, status=400)
-

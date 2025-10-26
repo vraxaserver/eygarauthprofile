@@ -72,7 +72,7 @@ class EygarHostViewSet(ViewSet):
     def list(self, request, *args, **kwargs):
         """
         Get list of all host profiles.
-        This method is mapped to URLs like /api/profiles/hosts/.
+        This method is mapped to URLs like /api/v1/profiles/hosts/.
         """
         # Only admin or superuser can request a list of all hosts
         # if not request.user.is_staff:
@@ -101,7 +101,7 @@ class EygarHostViewSet(ViewSet):
     def my_profile(self, request):
         """
         Returns the host profile for the currently authenticated user.
-        This method is mapped to the URL: /api/profiles/hosts/my/
+        This method is mapped to the URL: /api/v1/profiles/hosts/my/
         """
         try:
             # Use the existing helper method to get the user's profile
@@ -118,7 +118,7 @@ class EygarHostViewSet(ViewSet):
     def business_profile(self, request):
         """Create or update business profile (Step 1)"""
         profile = self.get_eygar_host()
-        
+
         # Check if user can access this step
         if not profile.can_proceed_to_step('business_profile'):
             return Response(
@@ -131,29 +131,29 @@ class EygarHostViewSet(ViewSet):
                 business_profile, created = BusinessProfile.objects.get_or_create(
                     eygar_host=profile
                 )
-                
+
                 serializer = BusinessProfileSerializer(
-                    business_profile, 
-                    data=request.data, 
+                    business_profile,
+                    data=request.data,
                     partial=True
                 )
-                
+
                 if serializer.is_valid():
                     serializer.save()
-                    
+
                     # Mark step as completed and update current step
                     profile.business_profile_completed = True
                     profile.current_step = 'identity_verification'
                     profile.save()
-                    
+
                     return Response({
                         'message': 'Business profile saved successfully',
                         'data': serializer.data,
                         'next_step': profile.get_next_step()
                     }, status=status.HTTP_200_OK)
-                
+
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-                
+
         except Exception as e:
             return Response(
                 {'error': 'Failed to save business profile'},
@@ -164,7 +164,7 @@ class EygarHostViewSet(ViewSet):
     def identity_verification(self, request):
         """Upload identity documents for verification (Step 2)"""
         profile = self.get_eygar_host()
-        
+
         # Check if user can access this step
         if not profile.can_proceed_to_step('identity_verification'):
             return Response(
@@ -177,19 +177,19 @@ class EygarHostViewSet(ViewSet):
                 identity_verification, created = IdentityVerification.objects.get_or_create(
                     eygar_host=profile
                 )
-                
+
                 serializer = IdentityVerificationSerializer(
                     identity_verification,
                     data=request.data,
                     partial=True
                 )
-                
+
                 if serializer.is_valid():
                     serializer.save()
-                    
+
                     # Trigger document verification process
                     verification_result = verify_identity_document(identity_verification)
-                    
+
                     if verification_result['success']:
                         identity_verification.verification_status = 'verified'
                         identity_verification.verified_at = timezone.now()
@@ -197,12 +197,12 @@ class EygarHostViewSet(ViewSet):
                         identity_verification.fathers_name = verification_result.get('fathers_name', '')
                         # Update other extracted fields...
                         identity_verification.save()
-                        
+
                         # Mark step as completed
                         profile.identity_verification_completed = True
                         profile.current_step = 'contact_details'
                         profile.save()
-                        
+
                         return Response({
                             'message': 'Identity verification completed successfully',
                             'verification_status': 'verified',
@@ -212,15 +212,15 @@ class EygarHostViewSet(ViewSet):
                         identity_verification.verification_status = 'rejected'
                         identity_verification.verification_notes = verification_result.get('error', 'Document verification failed')
                         identity_verification.save()
-                        
+
                         return Response({
                             'message': 'Document verification failed',
                             'error': verification_result.get('error'),
                             'verification_status': 'rejected'
                         }, status=status.HTTP_400_BAD_REQUEST)
-                
+
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-                
+
         except Exception as e:
             return Response(
                 {'error': 'Failed to process identity verification'},
@@ -231,7 +231,7 @@ class EygarHostViewSet(ViewSet):
     def contact_details(self, request):
         """Add contact details and trigger verification (Step 3)"""
         profile = self.get_eygar_host()
-        
+
         # Check if user can access this step
         if not profile.can_proceed_to_step('contact_details'):
             return Response(
@@ -244,33 +244,33 @@ class EygarHostViewSet(ViewSet):
                 contact_details, created = ContactDetails.objects.get_or_create(
                     eygar_host=profile
                 )
-                
+
                 serializer = ContactDetailsSerializer(
                     contact_details,
                     data=request.data,
                     partial=True
                 )
-                
+
                 if serializer.is_valid():
                     serializer.save()
-                    
+
                     # Auto-trigger mobile verification
                     if contact_details.mobile_number:
                         self.send_mobile_verification(contact_details)
-                    
+
                     # Mark step as completed
                     profile.contact_details_completed = True
                     profile.current_step = 'review_submission'
                     profile.save()
-                    
+
                     return Response({
                         'message': 'Contact details saved successfully',
                         'data': serializer.data,
                         'next_step': profile.get_next_step()
                     }, status=status.HTTP_200_OK)
-                
+
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-                
+
         except Exception as e:
             return Response(
                 {'error': 'Failed to save contact details'},
@@ -281,7 +281,7 @@ class EygarHostViewSet(ViewSet):
     def submit_for_review(self, request):
         """Submit profile for admin review (Step 4)"""
         profile = self.get_eygar_host()
-        
+
         # Check if user can access this step
         if not profile.can_proceed_to_step('review_submission'):
             return Response(
@@ -305,22 +305,22 @@ class EygarHostViewSet(ViewSet):
                 review_submission, created = ReviewSubmission.objects.get_or_create(
                     eygar_host=profile
                 )
-                
+
                 serializer = ReviewSubmissionSerializer(
                     review_submission,
                     data=request.data,
                     partial=True
                 )
-                
+
                 if serializer.is_valid():
                     serializer.save()
-                    
+
                     # Update profile status
                     profile.review_submission_completed = True
                     profile.status = 'submitted'
                     profile.submitted_at = timezone.now()
                     profile.save()
-                    
+
                     # Create status history
                     ProfileStatusHistory.objects.create(
                         eygar_host=profile,
@@ -329,21 +329,21 @@ class EygarHostViewSet(ViewSet):
                         changed_by=request.user,
                         change_reason='Profile submitted for review'
                     )
-                    
+
                     # Send email notification to user
                     self.send_submission_email(profile)
-                    
+
                     # Send notification to admins/moderators
                     self.notify_admins_new_submission(profile)
-                    
+
                     return Response({
                         'message': 'Profile submitted for review successfully',
                         'status': 'submitted',
                         'submitted_at': profile.submitted_at
                     }, status=status.HTTP_200_OK)
-                
+
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-                
+
         except Exception as e:
             return Response(
                 {'error': 'Failed to submit profile for review'},
@@ -371,11 +371,11 @@ class EygarHostViewSet(ViewSet):
         """Send SMS verification code"""
         # Generate 6-digit code
         verification_code = ''.join(random.choices(string.digits, k=6))
-        
+
         contact_details.mobile_verification_code = verification_code
         contact_details.mobile_verification_sent_at = timezone.now()
         contact_details.save()
-        
+
         # Send SMS (implement your SMS provider integration)
         send_sms_verification(contact_details.mobile_number, verification_code)
 
@@ -384,19 +384,19 @@ class EygarHostViewSet(ViewSet):
         subject = "Host Profile Submitted for Review"
         message = f"""
         Dear {profile.user.first_name or profile.user.username},
-        
+
         Your host profile has been successfully submitted for review.
-        
+
         Our team will review your application and get back to you within 2-3 business days.
-        
+
         You will receive an email notification once the review is completed.
-        
+
         Thank you for your patience.
-        
+
         Best regards,
         The Review Team
         """
-        
+
         send_mail(
             subject,
             message,
@@ -421,22 +421,22 @@ class MobileVerificationView(APIView):
         try:
             profile = get_object_or_404(EygarHost, user=request.user)
             contact_details = get_object_or_404(ContactDetails, eygar_host=profile)
-            
+
             serializer = MobileVerificationSerializer(data=request.data)
             if serializer.is_valid():
                 mobile_number = serializer.validated_data['mobile_number']
-                
+
                 # Generate verification code
                 verification_code = ''.join(random.choices(string.digits, k=6))
-                
+
                 # Update contact details
                 contact_details.mobile_verification_code = verification_code
                 contact_details.mobile_verification_sent_at = timezone.now()
                 contact_details.save()
-                
+
                 # Send SMS
                 success = send_sms_verification(mobile_number, verification_code)
-                
+
                 if success:
                     return Response({
                         'message': 'Verification code sent successfully'
@@ -445,9 +445,9 @@ class MobileVerificationView(APIView):
                     return Response({
                         'error': 'Failed to send verification code'
                     }, status=status.HTTP_400_BAD_REQUEST)
-                    
+
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-            
+
         except Exception as e:
             return Response(
                 {'error': 'Failed to send verification code'},
@@ -464,20 +464,20 @@ class VerifyMobileCodeView(APIView):
         try:
             profile = get_object_or_404(EygarHost, user=request.user)
             contact_details = get_object_or_404(ContactDetails, eygar_host=profile)
-            
+
             serializer = VerifyMobileCodeSerializer(data=request.data)
             if serializer.is_valid():
                 verification_code = serializer.validated_data['verification_code']
-                
+
                 # Check if code matches and is not expired (valid for 10 minutes)
                 if (contact_details.mobile_verification_code == verification_code and
                     contact_details.mobile_verification_sent_at and
                     (timezone.now() - contact_details.mobile_verification_sent_at).seconds < 600):
-                    
+
                     contact_details.mobile_verified = 'verified'
                     contact_details.mobile_verification_code = ''  # Clear the code
                     contact_details.save()
-                    
+
                     return Response({
                         'message': 'Mobile number verified successfully'
                     }, status=status.HTTP_200_OK)
@@ -485,9 +485,9 @@ class VerifyMobileCodeView(APIView):
                     return Response({
                         'error': 'Invalid or expired verification code'
                     }, status=status.HTTP_400_BAD_REQUEST)
-                    
+
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-            
+
         except Exception as e:
             return Response(
                 {'error': 'Failed to verify mobile number'},
@@ -515,13 +515,13 @@ class AdminReviewViewSet(ViewSet):
     def review(self, request, pk=None):
         """Review and update profile status"""
         profile = get_object_or_404(EygarHost, pk=pk)
-        
+
         serializer = AdminReviewSerializer(profile, data=request.data, partial=True)
         if serializer.is_valid():
             old_status = profile.status
             new_status = serializer.validated_data['status']
             review_notes = serializer.validated_data.get('review_notes', '')
-            
+
             with transaction.atomic():
                 # Update profile
                 profile.status = new_status
@@ -529,7 +529,7 @@ class AdminReviewViewSet(ViewSet):
                 profile.reviewed_at = timezone.now()
                 profile.reviewer = request.user
                 profile.save()
-                
+
                 # Create status history
                 ProfileStatusHistory.objects.create(
                     eygar_host=profile,
@@ -538,15 +538,15 @@ class AdminReviewViewSet(ViewSet):
                     changed_by=request.user,
                     change_reason=review_notes
                 )
-                
+
                 # Send email notification to user
                 self.send_review_result_email(profile, new_status, review_notes)
-                
+
                 return Response({
                     'message': f'Profile {new_status} successfully',
                     'status': new_status
                 }, status=status.HTTP_200_OK)
-        
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def send_review_result_email(self, profile, status, review_notes):
@@ -557,23 +557,23 @@ class AdminReviewViewSet(ViewSet):
             'pending': 'Your host profile is still under review.',
             'on_hold': 'Your host profile has been put on hold.'
         }
-        
+
         subject = f"Host Profile Review Result - {status.title()}"
         message = f"""
         Dear {profile.user.first_name or profile.user.username},
-        
+
         {status_messages.get(status, 'Your host profile status has been updated.')}
-        
+
         Status: {status.title()}
-        
+
         {f"Review Notes: {review_notes}" if review_notes else ""}
-        
+
         {"You can now start hosting!" if status == 'approved' else ""}
-        
+
         Best regards,
         The Review Team
         """
-        
+
         send_mail(
             subject,
             message,
@@ -605,4 +605,3 @@ class EygarProfileViewSet(ReadOnlyModelViewSet):
         queryset = self.get_queryset()
         serializer = self.get_serializer(queryset.first())
         return Response(serializer.data)
-

@@ -1,7 +1,7 @@
 from rest_framework import status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.viewsets import ViewSet, ReadOnlyModelViewSet
+from rest_framework.viewsets import ViewSet, ReadOnlyModelViewSet, ModelViewSet
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import get_user_model
@@ -16,14 +16,17 @@ User = get_user_model()
 
 from .models import (
     EygarHost, BusinessProfile, IdentityVerification,
-    ContactDetails, ReviewSubmission, ProfileStatusHistory
+    ContactDetails, ReviewSubmission, ProfileStatusHistory,
+    VendorProfile, CompanyDetails, ServiceArea, VendorContactDetails, ReviewVendorSubmission
 )
 from .serializers import (
     EygarHostSerializer, EygarHostDetailSerializer,
     BusinessProfileSerializer, IdentityVerificationSerializer,
     ContactDetailsSerializer, ReviewSubmissionSerializer,
     MobileVerificationSerializer, VerifyMobileCodeSerializer,
-    AdminReviewSerializer, EygarProfileSerializer
+    AdminReviewSerializer, EygarProfileSerializer,
+    VendorProfileSerializer, CompanyDetailsSerializer,
+    ServiceAreaSerializer, VendorContactDetailsSerializer, ReviewVendorSubmissionSerializer
 )
 from .permissions import IsOwnerOrReadOnly, IsAdminOrModerator
 from .utils import send_sms_verification, verify_identity_document
@@ -293,7 +296,8 @@ class EygarHostViewSet(ViewSet):
         if not all([
             profile.business_profile_completed,
             profile.identity_verification_completed,
-            profile.contact_details_completed
+            profile.contact_details_completed,
+            profile.review_submission_completed
         ]):
             return Response(
                 {'error': 'All previous steps must be completed before submission'},
@@ -302,11 +306,11 @@ class EygarHostViewSet(ViewSet):
 
         try:
             with transaction.atomic():
-                review_submission, created = ReviewSubmission.objects.get_or_create(
+                review_submission, created = ReviewVendorSubmission.objects.get_or_create(
                     eygar_host=profile
                 )
 
-                serializer = ReviewSubmissionSerializer(
+                serializer = ReviewVendorSubmissionSerializer(
                     review_submission,
                     data=request.data,
                     partial=True
@@ -603,5 +607,244 @@ class EygarProfileViewSet(ReadOnlyModelViewSet):
         Custom list action to return a single object instead of a list.
         """
         queryset = self.get_queryset()
-        serializer = self.get_serializer(queryset.first())
+        serializer = self.get_serializer(queryset)
         return Response(serializer.data)
+
+class VendorProfileViewSet(ModelViewSet):
+    queryset = VendorProfile.objects.all()
+    serializer_class = VendorProfileSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return self.queryset.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    def list(self, request, *args, **kwargs):
+        """
+        Custom list action to return a single object instead of a list.
+        """
+        vendros = VendorProfile.objects.all()
+        serializer = self.get_serializer(vendros, many=True)
+        return Response(serializer.data)
+
+    def get_eygar_vendor(self):
+        """Get or create host profile for current user"""
+        profile, created = VendorProfile.objects.get_or_create(
+            user=self.request.user,
+            defaults={'current_step': 'company_details'}
+        )
+        return profile
+
+    @action(detail=False, methods=['get'])
+    def current_status(self, request):
+        """Get current step information"""
+        profile = self.get_eygar_vendor()
+        return Response({
+            'current_step': profile.current_step,
+            'next_step': profile.get_next_step(),
+            'completion_percentage': profile.completion_percentage,
+            'status': profile.status,
+            'steps_completed': {
+                'company_details': profile.company_details_completed,
+                'service_area': profile.service_area_completed,
+                'contact_details': profile.contact_details_completed,
+                'review_submission': profile.review_submission_completed,
+            }
+        })
+
+    @action(detail=False, methods=['get'], url_path='my')
+    def my_profile(self, request):
+        """
+        Returns the vendor profile for the currently authenticated user.
+        """
+        try:
+            profile = self.get_eygar_vendor()
+            serializer = VendorProfileSerializer(profile)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to retrieve your vendor profile: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=False, methods=['post'])
+    def company_details(self, request):
+        """Create or update company details (Step 1)."""
+        profile = self.get_eygar_vendor()
+
+        try:
+            with transaction.atomic():
+                company_details_obj, created = CompanyDetails.objects.get_or_create(
+                    vendor_profile=profile
+                )
+                serializer = CompanyDetailsSerializer(
+                    company_details_obj, data=request.data, partial=True
+                )
+                if serializer.is_valid():
+                    serializer.save()
+                    profile.company_details_completed = True
+                    profile.current_step = 'service_area'
+                    profile.save()
+                    return Response({
+                        'message': 'Company details saved successfully',
+                        'data': serializer.data,
+                        'next_step': profile.get_next_step()
+                    }, status=status.HTTP_200_OK)
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to save company details: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=False, methods=['post'])
+    def service_area(self, request):
+        """Create or update service area (Step 2)."""
+        profile = self.get_eygar_vendor()
+        if not profile.company_details_completed:
+            return Response(
+                {'error': 'Please complete company details first'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        try:
+            with transaction.atomic():
+                serializer = ServiceAreaSerializer(data=request.data)
+                if serializer.is_valid():
+                    serializer.save(vendor_profile=profile)
+                    profile.service_area_completed = True
+                    profile.current_step = 'contact_details'
+                    profile.save()
+                    return Response({
+                        'message': 'Service area saved successfully',
+                        'data': serializer.data,
+                        'next_step': profile.get_next_step()
+                    }, status=status.HTTP_200_OK)
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to save service area: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=False, methods=['post'])
+    def contact_details(self, request):
+        """Create or update contact details (Step 3)."""
+        import pdb; pdb.set_trace()
+        profile = self.get_eygar_vendor()
+        if not profile.service_area_completed:
+            return Response(
+                {'error': 'Please complete service area first'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        try:
+            with transaction.atomic():
+                contact_details_obj, created = VendorContactDetails.objects.get_or_create(
+                    vendor_profile=profile
+                )
+                serializer = VendorContactDetailsSerializer(
+                    contact_details_obj, data=request.data, partial=True
+                )
+                if serializer.is_valid():
+                    serializer.save()
+                    profile.contact_details_completed = True
+                    profile.current_step = 'review_submission'
+                    profile.save()
+                    return Response({
+                        'message': 'Contact details saved successfully',
+                        'data': serializer.data,
+                        'next_step': profile.get_next_step()
+                    }, status=status.HTTP_200_OK)
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to save contact details: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=False, methods=['post'])
+    def submit_for_review(self, request):
+        """Submit profile for admin review (Step 4)."""
+        profile = self.get_eygar_vendor()
+        if not all([
+            profile.company_details_completed,
+            profile.service_area_completed,
+            profile.contact_details_completed
+        ]):
+            return Response(
+                {'error': 'All previous steps must be completed before submission'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        try:
+            with transaction.atomic():
+                profile.review_submission_completed = True
+                profile.current_step = 'completed'
+                profile.status = 'submitted'
+                profile.submitted_at = timezone.now()
+                profile.save()
+                # Note: To enable status history for vendors, your ProfileStatusHistory model
+                # would need a relationship to VendorProfile.
+                self.send_submission_email(profile)
+                self.notify_admins_new_submission(profile)
+                return Response({
+                    'message': 'Profile submitted for review successfully',
+                    'status': 'submitted',
+                    'submitted_at': profile.submitted_at
+                }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to submit profile for review: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def send_submission_email(self, profile):
+        """Send email notification to user after submission."""
+        subject = "Vendor Profile Submitted for Review"
+        message = f"""
+        Dear {profile.user.first_name or profile.user.username},
+
+        Your vendor profile has been successfully submitted for review.
+        Our team will review your application and get back to you within 2-3 business days.
+        You will receive an email notification once the review is completed.
+
+        Thank you for your patience.
+        Best regards,
+        The Review Team
+        """
+        send_mail(
+            subject,
+            message,
+            settings.DEFAULT_FROM_EMAIL,
+            [profile.user.email],
+            fail_silently=True,
+        )
+
+    def notify_admins_new_submission(self, profile):
+        """Notify admins about new profile submission."""
+        # This can be implemented to send emails or other types of notifications.
+        pass
+
+class CompanyDetailsViewSet(ModelViewSet):
+    queryset = CompanyDetails.objects.all()
+    serializer_class = CompanyDetailsSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return self.queryset.filter(vendor_profile__user=self.request.user)
+
+class ServiceAreaViewSet(ModelViewSet):
+    queryset = ServiceArea.objects.all()
+    serializer_class = ServiceAreaSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return self.queryset.filter(vendor_profile__user=self.request.user)
+
+class VendorContactDetailsViewSet(ModelViewSet):
+    queryset = VendorContactDetails.objects.all()
+    serializer_class = VendorContactDetailsSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return self.queryset.filter(vendor_profile__user=self.request.user)

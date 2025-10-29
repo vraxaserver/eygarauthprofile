@@ -4,7 +4,8 @@ from django.urls import reverse
 from django.utils.safestring import mark_safe
 from .models import (
     EygarHost, BusinessProfile, IdentityVerification,
-    ContactDetails, ReviewSubmission, ProfileStatusHistory
+    ContactDetails, ReviewSubmission, ProfileStatusHistory,
+    VendorProfile, CompanyDetails, ServiceArea, VendorContactDetails
 )
 
 
@@ -132,13 +133,13 @@ class EygarHostAdmin(admin.ModelAdmin):
             )
             for host in queryset
         ]
-        
+
         # Then, perform the bulk update
         updated_count = queryset.update(status='approved', reviewer=request.user, reviewed_at=timezone.now())
-        
+
         # Finally, create the history records
         ProfileStatusHistory.objects.bulk_create(history_entries)
-        
+
         self.message_user(request, f'{updated_count} profiles approved successfully.')
 
     approve_profiles.short_description = 'Approve selected profiles'
@@ -154,10 +155,10 @@ class EygarHostAdmin(admin.ModelAdmin):
             )
             for host in queryset
         ]
-        
+
         updated_count = queryset.update(status='rejected', reviewer=request.user, reviewed_at=timezone.now())
         ProfileStatusHistory.objects.bulk_create(history_entries)
-        
+
         self.message_user(request, f'{updated_count} profiles rejected.')
 
     reject_profiles.short_description = 'Reject selected profiles'
@@ -173,10 +174,10 @@ class EygarHostAdmin(admin.ModelAdmin):
             )
             for host in queryset
         ]
-        
+
         updated_count = queryset.update(status='pending')
         ProfileStatusHistory.objects.bulk_create(history_entries)
-        
+
         self.message_user(request, f'{updated_count} profiles marked as pending.')
 
     mark_pending.short_description = 'Mark as pending'
@@ -393,3 +394,116 @@ class ProfileStatusHistoryAdmin(admin.ModelAdmin):
     def has_change_permission(self, request, obj=None):
         # Make status history read-only
         return False
+
+
+@admin.register(CompanyDetails)
+class CompanyDetailsAdmin(admin.ModelAdmin):
+    list_display = ('company_name', 'vendor_profile_user')
+    search_fields = ('company_name', 'vendor_profile__user__username')
+
+    def vendor_profile_user(self, obj):
+        return obj.vendor_profile.user
+    vendor_profile_user.short_description = 'User'
+
+@admin.register(ServiceArea)
+class ServiceAreaAdmin(admin.ModelAdmin):
+    list_display = ('city', 'state', 'country', 'vendor_profile_user')
+    search_fields = ('city', 'state', 'country', 'vendor_profile__user__username')
+
+    def vendor_profile_user(self, obj):
+        return obj.vendor_profile.user
+    vendor_profile_user.short_description = 'User'
+
+@admin.register(VendorContactDetails)
+class VendorContactDetailsAdmin(admin.ModelAdmin):
+    list_display = ('primary_contact_email', 'primary_contact_phone', 'vendor_profile_user')
+    search_fields = ('primary_contact_email', 'primary_contact_phone', 'vendor_profile__user__username')
+
+    def vendor_profile_user(self, obj):
+        return obj.vendor_profile.user
+    vendor_profile_user.short_description = 'User'
+
+@admin.register(VendorProfile)
+class VendorProfileAdmin(admin.ModelAdmin):
+    """
+    Admin configuration for the VendorProfile model.
+    """
+    list_display = (
+        'user',
+        'get_company_name',
+        'status',
+        'submitted_at',
+        'company_details_completed',
+        'service_area_completed',
+        'contact_details_completed'
+    )
+    list_filter = ('status', 'submitted_at')
+    search_fields = ('user__username', 'user__email', 'company_details__company_name')
+    list_editable = ('status',)
+
+    readonly_fields = ('user', 'submitted_at', 'created_at', 'updated_at')
+
+    fieldsets = (
+        ('Profile Information', {
+            'fields': ('user', 'get_company_name')
+        }),
+        ('Completion Status', {
+            'fields': ('company_details_completed', 'service_area_completed', 'contact_details_completed')
+        }),
+        ('Status and Timestamps', {
+            'fields': ('status', 'submitted_at', 'created_at', 'updated_at')
+        }),
+    )
+
+    actions = ['approve_vendors', 'reject_vendors']
+
+    def get_company_name(self, obj):
+        # Safely get the company name from the related CompanyDetails model
+        try:
+            return obj.company_details.company_name
+        except CompanyDetails.DoesNotExist:
+            return "N/A"
+    get_company_name.short_description = 'Company Name'
+
+    def send_status_update_email(self, request, queryset, new_status):
+        """
+        Sends an email notification to users about their vendor profile status update.
+        """
+        for profile in queryset:
+            subject = f"Your Vendor Profile has been {new_status.title()}"
+            message = f"""
+            Hello {profile.user.first_name or profile.user.username},
+
+            This is an update on your vendor profile submission.
+            Your profile has been {new_status}.
+
+            {'You can now access vendor features on our platform.' if new_status == 'approved' else 'Please review your profile details and resubmit if necessary.'}
+
+            Thank you,
+            The Admin Team
+            """
+            send_mail(
+                subject,
+                message,
+                settings.DEFAULT_FROM_EMAIL,
+                [profile.user.email],
+                fail_silently=False,
+            )
+
+    def approve_vendors(self, request, queryset):
+        """
+        Admin action to approve selected vendor profiles.
+        """
+        updated_count = queryset.update(status='approved')
+        self.message_user(request, f'{updated_count} vendor profiles have been approved.')
+        self.send_status_update_email(request, queryset, 'approved')
+    approve_vendors.short_description = "Approve selected vendors"
+
+    def reject_vendors(self, request, queryset):
+        """
+        Admin action to reject selected vendor profiles.
+        """
+        updated_count = queryset.update(status='rejected')
+        self.message_user(request, f'{updated_count} vendor profiles have been rejected.')
+        self.send_status_update_email(request, queryset, 'rejected')
+    reject_vendors.short_description = "Reject selected vendors"

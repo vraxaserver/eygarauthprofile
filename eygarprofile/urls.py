@@ -1,11 +1,13 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
-    EygarHostViewSet, 
+    EygarHostViewSet,
     AdminReviewViewSet,
     MobileVerificationView,
     VerifyMobileCodeView,
-    EygarProfileViewSet
+    EygarProfileViewSet,
+    VendorProfileViewSet, CompanyDetailsViewSet,
+    ServiceAreaViewSet, VendorContactDetailsViewSet
 )
 
 app_name = 'eygarprofile'
@@ -13,6 +15,10 @@ app_name = 'eygarprofile'
 # Create router for viewsets
 router = DefaultRouter()
 router.register('hosts', EygarHostViewSet, basename='eygarhost')
+router.register('vendors', VendorProfileViewSet)
+# router.register('vendor-company-details', CompanyDetailsViewSet)
+# router.register('vendor-service-areas', ServiceAreaViewSet)
+# router.register('vendor-contact-details', VendorContactDetailsViewSet)
 router.register('', EygarProfileViewSet, basename='eygarprofile')
 
 # router.register('vendors', EygarVendorViewSet, basename='eygarvendor')
@@ -21,11 +27,11 @@ router.register('admin/reviews', AdminReviewViewSet, basename='admin-review')
 urlpatterns = [
     # Include router URLs
     path('profiles/', include(router.urls)),
-    
+
     # Mobile verification endpoints
     path('verify/mobile/send/', MobileVerificationView.as_view(), name='send-mobile-verification'),
     path('verify/mobile/confirm/', VerifyMobileCodeView.as_view(), name='verify-mobile-code'),
-    
+
     # Additional custom endpoints if needed
     # path('profiles/current/', EygarHostViewSet.as_view({'get': 'current'}), name='current-profile'),
 ]

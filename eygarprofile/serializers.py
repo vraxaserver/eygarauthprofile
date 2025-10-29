@@ -1,8 +1,9 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from .models import (
-    EygarHost, BusinessProfile, IdentityVerification, 
-    ContactDetails, ReviewSubmission, ProfileStatusHistory
+    EygarHost, BusinessProfile, IdentityVerification,
+    ContactDetails, ReviewSubmission, ProfileStatusHistory,
+    VendorProfile, CompanyDetails, ServiceArea, VendorContactDetails, ReviewVendorSubmission
 )
 
 User = get_user_model()
@@ -11,7 +12,7 @@ User = get_user_model()
 class EygarHostSerializer(serializers.ModelSerializer):
     completion_percentage = serializers.ReadOnlyField()
     next_step = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = EygarHost
         fields = [
@@ -33,7 +34,7 @@ class BusinessProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = BusinessProfile
         fields = [
-            'business_name', 'business_type', 'license_number', 
+            'business_name', 'business_type', 'license_number',
             'license_document', 'business_logo', 'business_address_line1',
             'business_address_line2', 'business_city', 'business_state',
             'business_postal_code', 'business_country', 'business_description',
@@ -46,12 +47,12 @@ class BusinessProfileSerializer(serializers.ModelSerializer):
             # Validate file size (max 5MB)
             if value.size > 5 * 1024 * 1024:
                 raise serializers.ValidationError("License document size should not exceed 5MB.")
-            
+
             # Validate file type
             allowed_extensions = ['.pdf', '.jpg', '.jpeg', '.png']
             if not any(value.name.lower().endswith(ext) for ext in allowed_extensions):
                 raise serializers.ValidationError("License document must be PDF, JPG, JPEG, or PNG format.")
-        
+
         return value
 
     def validate_business_logo(self, value):
@@ -59,12 +60,12 @@ class BusinessProfileSerializer(serializers.ModelSerializer):
             # Validate file size (max 2MB)
             if value.size > 2 * 1024 * 1024:
                 raise serializers.ValidationError("Business logo size should not exceed 2MB.")
-            
+
             # Validate file type
             allowed_extensions = ['.jpg', '.jpeg', '.png', '.gif']
             if not any(value.name.lower().endswith(ext) for ext in allowed_extensions):
                 raise serializers.ValidationError("Business logo must be JPG, JPEG, PNG, or GIF format.")
-        
+
         return value
 
 
@@ -90,12 +91,12 @@ class IdentityVerificationSerializer(serializers.ModelSerializer):
             # Validate file size (max 5MB)
             if value.size > 5 * 1024 * 1024:
                 raise serializers.ValidationError("Document image size should not exceed 5MB.")
-            
+
             # Validate file type
             allowed_extensions = ['.jpg', '.jpeg', '.png']
             if not any(value.name.lower().endswith(ext) for ext in allowed_extensions):
                 raise serializers.ValidationError("Document image must be JPG, JPEG, or PNG format.")
-        
+
         return value
 
     def validate_document_image_back(self, value):
@@ -103,12 +104,12 @@ class IdentityVerificationSerializer(serializers.ModelSerializer):
             # Validate file size (max 5MB)
             if value.size > 5 * 1024 * 1024:
                 raise serializers.ValidationError("Document image size should not exceed 5MB.")
-            
+
             # Validate file type
             allowed_extensions = ['.jpg', '.jpeg', '.png']
             if not any(value.name.lower().endswith(ext) for ext in allowed_extensions):
                 raise serializers.ValidationError("Document image must be JPG, JPEG, or PNG format.")
-        
+
         return value
 
 
@@ -158,9 +159,29 @@ class ReviewSubmissionSerializer(serializers.ModelSerializer):
         return value
 
 
+class ReviewVendorSubmissionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ReviewVendorSubmission
+        fields = [
+            'additional_notes', 'terms_accepted', 'privacy_policy_accepted',
+            'submitted_at'
+        ]
+        read_only_fields = ['submitted_at']
+
+    def validate_terms_accepted(self, value):
+        if not value:
+            raise serializers.ValidationError("You must accept the terms and conditions to proceed.")
+        return value
+
+    def validate_privacy_policy_accepted(self, value):
+        if not value:
+            raise serializers.ValidationError("You must accept the privacy policy to proceed.")
+        return value
+
+
 class ProfileStatusHistorySerializer(serializers.ModelSerializer):
     changed_by_username = serializers.CharField(source='changed_by.username', read_only=True)
-    
+
     class Meta:
         model = ProfileStatusHistory
         fields = [
@@ -208,7 +229,7 @@ class EygarHostDetailSerializer(serializers.ModelSerializer):
 
 class MobileVerificationSerializer(serializers.Serializer):
     mobile_number = serializers.CharField(max_length=20)
-    
+
     def validate_mobile_number(self, value):
         import re
         pattern = r'^\+?1?\d{9,15}$'
@@ -219,7 +240,7 @@ class MobileVerificationSerializer(serializers.Serializer):
 
 class VerifyMobileCodeSerializer(serializers.Serializer):
     verification_code = serializers.CharField(max_length=6, min_length=6)
-    
+
     def validate_verification_code(self, value):
         if not value.isdigit():
             raise serializers.ValidationError("Verification code must contain only digits.")
@@ -249,9 +270,41 @@ class EygarHostProfileSerializer(serializers.ModelSerializer):
 #         model = EygarVendor
 #         fields = '__all__'
 
+
+
+class CompanyDetailsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CompanyDetails
+        fields = '__all__'
+
+class ServiceAreaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ServiceArea
+        fields = '__all__'
+
+class VendorContactDetailsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VendorContactDetails
+        fields = '__all__'
+
+class VendorProfileSerializer(serializers.ModelSerializer):
+    company_details = CompanyDetailsSerializer()
+    service_areas = ServiceAreaSerializer(many=True)
+    contact_details = VendorContactDetailsSerializer()
+    user_info = serializers.SerializerMethodField()
+
+    class Meta:
+        model = VendorProfile
+        fields = [
+            'id', 'user', 'status', 'current_step',
+            'company_details_completed', 'service_area_completed', 'contact_details_completed',
+            'company_details', 'service_areas', 'contact_details'
+        ]
+
+
 class EygarProfileSerializer(serializers.ModelSerializer):
     host_profile = EygarHostProfileSerializer(source='eygar_host', read_only=True)
-    # vendor_profile = EygarVendorSerializer(source='eygar_vendor', read_only=True)
+    # vendor_profile = VendorProfileSerializer(source='vendor_profile', read_only=True)
 
     class Meta:
         model = User

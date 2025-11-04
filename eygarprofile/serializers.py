@@ -287,6 +287,16 @@ class VendorContactDetailsSerializer(serializers.ModelSerializer):
         model = VendorContactDetails
         fields = '__all__'
 
+
+class EygarVendorSerializer(serializers.ModelSerializer):
+    company_details = CompanyDetailsSerializer()
+    class Meta:
+        model = VendorProfile
+        fields = [
+            'id', 'status', 'company_details'
+        ]
+
+
 class VendorProfileSerializer(serializers.ModelSerializer):
     company_details = CompanyDetailsSerializer()
     service_areas = ServiceAreaSerializer(many=True)

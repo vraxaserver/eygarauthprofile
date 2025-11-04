@@ -9,6 +9,7 @@ from rest_framework.response import Response
 
 from .serializers import RegisterSerializer, UserSerializer, ChangePasswordSerializer, UserProfileSerializer
 from .tokens import make_token, parse_token
+from conf.utils.aws_utils import publish_to_sqs
 
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -39,9 +40,18 @@ class RegisterView(generics.CreateAPIView):
         user = serializer.save()
         token = make_token(user)
         activation_url = f"{settings.SITE_URL}{reverse('accounts:activate')}?token={token}"
-        subject = "Activate your account"
-        message = f"Click here to activate your account: {activation_url}"
-        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [user.email])
+        # subject = "Activate your account"
+        # message = f"Click here to activate your account: {activation_url}"
+        email_payload = {
+            'from_email': settings.DEFAULT_FROM_EMAIL,
+            'to_email': user.email,
+            'subject': "Activate your account",
+            'message': f"Click here to activate your account: {activation_url}"
+        }
+        # pdb.set_trace()
+        publish_to_sqs(email_payload)
+
+        # send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [user.email])
 
 
 class ActivateView(APIView):

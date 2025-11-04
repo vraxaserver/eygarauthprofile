@@ -10,6 +10,7 @@ from django.utils import timezone
 from django.core.mail import send_mail
 from django.conf import settings
 import random
+from conf.utils.aws_utils import publish_to_sqs
 import string
 
 User = get_user_model()
@@ -819,6 +820,13 @@ class VendorProfileViewSet(ModelViewSet):
             [profile.user.email],
             fail_silently=True,
         )
+        email_payload = {
+            'from_email': settings.DEFAULT_FROM_EMAIL,
+            'to_email': profile.user.email,
+            'subject': subject,
+            'message': message
+        }
+        publish_to_sqs(email_payload)
 
     def notify_admins_new_submission(self, profile):
         """Notify admins about new profile submission."""

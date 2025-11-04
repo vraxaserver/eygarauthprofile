@@ -186,12 +186,14 @@ DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', default='noreply@yourapp.co
 
 
 # Site url used to build activation link
-SITE_URL = os.environ.get('SITE_URL', 'http://localhost:8000')
+SITE_URL = os.getenv('SITE_URL', 'http://localhost:8000')
 
-# SMS Configuration (Twilio)
-TWILIO_ACCOUNT_SID = os.getenv('TWILIO_ACCOUNT_SID', default='')
-TWILIO_AUTH_TOKEN = os.getenv('TWILIO_AUTH_TOKEN', default='')
-TWILIO_PHONE_NUMBER = os.getenv('TWILIO_PHONE_NUMBER', default='')
+# AWS Configuration
+AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
+AWS_REGION_NAME = os.getenv('AWS_REGION_NAME', 'us-east-1') # Or your preferred region
+SNS_TOPIC_ARN = os.getenv('SNS_TOPIC_ARN')
+
 
 # Document Verification Settings
 DOCUMENT_VERIFICATION_ENABLED = os.getenv('DOCUMENT_VERIFICATION_ENABLED', default=True)

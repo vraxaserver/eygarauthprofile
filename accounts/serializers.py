@@ -2,7 +2,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
-from eygarprofile.serializers import EygarHostSerializer
+from eygarprofile.serializers import EygarHostSerializer, EygarVendorSerializer
 
 User = get_user_model()
 
@@ -38,6 +38,7 @@ class ChangePasswordSerializer(serializers.Serializer):
 
 class UserProfileSerializer(serializers.ModelSerializer):
     eygar_host = EygarHostSerializer(required=False, allow_null=True)
+    eygar_vendor = EygarVendorSerializer(required=False, allow_null=True, source='vendor_profile')
     avatar_url = serializers.SerializerMethodField()
 
     class Meta:
@@ -57,6 +58,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "eygar_host",
+            "eygar_vendor"
         )
         read_only_fields = ("id", "created_at", "updated_at")
 

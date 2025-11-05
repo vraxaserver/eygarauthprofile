@@ -33,6 +33,7 @@ class User(AbstractUser):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True, null=True, blank=True)
     avatar = models.ImageField(upload_to="avatars/", null=True, blank=True)
+    avatar_url = models.URLField(null=True, blank=True)
     is_email_verified = models.BooleanField(default=False)
     is_host_verified = models.BooleanField(default=False)
     is_vendor_verified = models.BooleanField(default=False)

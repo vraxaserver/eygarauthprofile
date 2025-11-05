@@ -1,5 +1,5 @@
 # eygarprofile/aws_utils.py
-
+import uuid
 import json
 import boto3
 import os
@@ -49,7 +49,7 @@ def publish_to_sns(message_type, payload):
         # Log the exception
         print(f"Error publishing to SNS: {e}")
         return None
-        
+
 
 def publish_to_sqs(email):
     resp = sqs.send_message(
@@ -63,3 +63,29 @@ def publish_to_sqs(email):
         }
     )
     return resp
+
+
+s3_client = boto3.client(
+    "s3",
+    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+    region_name=settings.AWS_S3_REGION_NAME,
+)
+
+def upload_fileobj_to_s3(file_obj, key_prefix="avatars/"):
+    """
+    Uploads an InMemoryUploadedFile/file-like object to S3 and returns the public URL.
+    key_prefix: path inside bucket, e.g. 'avatars/{user_id}/...'
+    """
+    ext = os.path.splitext(file_obj.name)[1] or ""
+    key = f"{key_prefix}{uuid.uuid4().hex}{ext}"
+    extra_args = {
+        "ACL": "public-read",               # public: quick & easy — consider CloudFront or presigned URLs for production
+        "ContentType": getattr(file_obj, "content_type", "application/octet-stream"),
+    }
+
+    s3_client.upload_fileobj(file_obj, settings.AWS_S3_BUCKET_NAME, key, ExtraArgs=extra_args)
+
+    # Construct URL — change if you use a CloudFront domain
+    url = f"https://{settings.AWS_S3_CUSTOM_DOMAIN}/{key}"
+    return url, key

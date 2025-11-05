@@ -29,7 +29,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ("id", "email", "avatar", "first_name", "last_name", "is_email_verified", "created_at", "updated_at")
+        fields = ("id", "email", "avatar_url", "first_name", "last_name", "is_email_verified", "created_at", "updated_at")
 
 
 class ChangePasswordSerializer(serializers.Serializer):
@@ -39,7 +39,7 @@ class ChangePasswordSerializer(serializers.Serializer):
 class UserProfileSerializer(serializers.ModelSerializer):
     eygar_host = EygarHostSerializer(required=False, allow_null=True)
     eygar_vendor = EygarVendorSerializer(required=False, allow_null=True, source='vendor_profile')
-    avatar_url = serializers.SerializerMethodField()
+    # avatar_url = serializers.SerializerMethodField()
 
     class Meta:
         model = User

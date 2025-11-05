@@ -14,6 +14,7 @@ from conf.utils.aws_utils import publish_to_sqs
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from conf.utils.aws_utils import upload_fileobj_to_s3
 import pdb
 
 User = get_user_model()
@@ -44,7 +45,7 @@ class RegisterView(generics.CreateAPIView):
         # message = f"Click here to activate your account: {activation_url}"
         email_payload = {
             'from_email': settings.DEFAULT_FROM_EMAIL,
-            'to_email': user.email,
+            'to_emails': [user.email],
             'subject': "Activate your account",
             'message': f"Click here to activate your account: {activation_url}"
         }
@@ -94,6 +95,29 @@ class MyView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return self.request.user
+
+    def update(self, request, *args, **kwargs):
+        user = self.get_object()
+        data = request.data.copy()  # QueryDict -> mutable copy
+
+        # If there's an avatar file in the request, upload it to S3 first
+        avatar_file = request.FILES.get("avatar", None)
+        if avatar_file:
+            # Use a path that groups by user id
+            key_prefix = f"avatars/{user.id}/"
+            url, key = upload_fileobj_to_s3(avatar_file, key_prefix=key_prefix)
+            # Put the S3 URL into the update payload
+            data["avatar_url"] = url
+
+            # Optional: If you want to store a local copy in avatar ImageField, you could:
+            # user.avatar.save(avatar_file.name, avatar_file, save=False)
+            # but typically we keep only avatar_url when using S3.
+
+        serializer = self.get_serializer(user, data=data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class MyProfileView(generics.RetrieveUpdateAPIView):

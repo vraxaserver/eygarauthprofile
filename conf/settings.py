@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     'drf_spectacular',
     'corsheaders',
     'rest_framework_simplejwt.token_blacklist',
+    'storages',
 
     # === Local apps ===
     'accounts',
@@ -120,7 +121,9 @@ STATICFILES_DIRS = [
 
 MEDIA_ROOT = BASE_DIR / 'media'
 
-MEDIA_URL = '/media/'
+# MEDIA_URL = '/media/'
+
+
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -191,9 +194,17 @@ SITE_URL = os.getenv('SITE_URL', 'http://localhost:8000')
 # AWS Configuration
 AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
 AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
-AWS_REGION_NAME = os.getenv('AWS_REGION_NAME', 'us-east-1') # Or your preferred region
+AWS_REGION_NAME = os.getenv('AWS_REGION_NAME', 'me-central-1') # Or your preferred region
 SNS_TOPIC_ARN = os.getenv('SNS_TOPIC_ARN')
+AWS_S3_BUCKET_NAME = os.getenv("AWS_S3_BUCKET_NAME")
+AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME")
 
+
+DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+
+AWS_S3_CUSTOM_DOMAIN = f"{AWS_S3_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com"
+
+MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/'
 
 # Document Verification Settings
 DOCUMENT_VERIFICATION_ENABLED = os.getenv('DOCUMENT_VERIFICATION_ENABLED', default=True)

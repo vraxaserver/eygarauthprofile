@@ -10,7 +10,7 @@ from django.utils import timezone
 from django.core.mail import send_mail
 from django.conf import settings
 import random
-from conf.utils.aws_utils import publish_to_sqs
+from conf.utils.aws_utils import publish_to_sqs, send_email_to_sqs
 import string
 
 User = get_user_model()
@@ -297,8 +297,7 @@ class EygarHostViewSet(ViewSet):
         if not all([
             profile.business_profile_completed,
             profile.identity_verification_completed,
-            profile.contact_details_completed,
-            profile.review_submission_completed
+            profile.contact_details_completed
         ]):
             return Response(
                 {'error': 'All previous steps must be completed before submission'},
@@ -307,11 +306,11 @@ class EygarHostViewSet(ViewSet):
 
         try:
             with transaction.atomic():
-                review_submission, created = ReviewVendorSubmission.objects.get_or_create(
+                review_submission, created = ReviewSubmission.objects.get_or_create(
                     eygar_host=profile
                 )
 
-                serializer = ReviewVendorSubmissionSerializer(
+                serializer = ReviewSubmissionSerializer(
                     review_submission,
                     data=request.data,
                     partial=True
@@ -402,12 +401,10 @@ class EygarHostViewSet(ViewSet):
         The Review Team
         """
 
-        send_mail(
-            subject,
-            message,
-            settings.DEFAULT_FROM_EMAIL,
-            [profile.user.email],
-            fail_silently=True,
+        send_email_to_sqs(
+            subject=subject,
+            message=message,
+            recipient_list=[profile.user.email],
         )
 
     def notify_admins_new_submission(self, profile):

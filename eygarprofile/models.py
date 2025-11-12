@@ -5,6 +5,10 @@ from django.utils import timezone
 import uuid
 import os
 
+from conf.utils.aws_utils import upload_fileobj_to_s3, upload_to_eygar_host
+from conf.storages import S3MediaStorage
+
+
 User = get_user_model()
 
 class EygarHost(models.Model):
@@ -95,6 +99,26 @@ def logo_upload_path(instance, filename):
     # Store in: business_logos/<eygar_host.id>/<filename>
     return os.path.join("business_logos", str(instance.eygar_host.id), filename)
 
+def get_license_upload_path(instance, filename):
+    """
+    Generates the upload path for the license document, renaming it with the eygar_host id.
+    """
+    ext = os.path.splitext(filename)[1]
+    host_id = instance.eygar_host.id
+    new_filename = f"{host_id}{ext}"
+    return f"hosts/{host_id}/licenses/{new_filename}"
+
+# A callable to generate the upload path for the business logo.
+def get_logo_upload_path(instance, filename):
+    """
+    Generates the upload path for the business logo, renaming it with the eygar_host id.
+    """
+    ext = os.path.splitext(filename)[1]
+    host_id = instance.eygar_host.id
+    new_filename = f"{host_id}{ext}"
+    return f"hosts/{host_id}/business_logos/{new_filename}"
+
+
 class BusinessProfile(models.Model):
     eygar_host = models.OneToOneField(EygarHost, on_delete=models.CASCADE, related_name='business_profile')
 
@@ -102,8 +126,17 @@ class BusinessProfile(models.Model):
     business_name = models.CharField(max_length=255)
     business_type = models.CharField(max_length=100, blank=True)
     license_number = models.CharField(max_length=100)
-    license_document = models.FileField(upload_to=license_upload_path, help_text="Upload business license document")
-    business_logo = models.ImageField(upload_to=logo_upload_path, null=True, blank=True)
+    license_document = models.FileField(
+        upload_to=get_license_upload_path,
+        storage=S3MediaStorage(),
+        help_text="Upload business license document"
+    )
+    business_logo = models.ImageField(
+        upload_to=get_logo_upload_path,
+        storage=S3MediaStorage(),
+        null=True,
+        blank=True
+    )
 
     # Business Address
     business_address_line1 = models.CharField(max_length=255)
@@ -127,6 +160,27 @@ class BusinessProfile(models.Model):
         return f"Business Profile - {self.business_name}"
 
 
+# A callable to generate the upload path for the identity document front image.
+def get_document_front_upload_path(instance, filename):
+    """
+    Generates the upload path for the front of the identity document.
+    Example: identity_documents/2025/11/some_filename.jpg
+    """
+    date_path = datetime.now().strftime('%Y/%m')
+    host_id = instance.eygar_host.id
+    return f"hosts/{host_id}/identity_documents/{date_path}/{filename}"
+
+# A callable to generate the upload path for the identity document back image.
+def get_document_back_upload_path(instance, filename):
+    """
+    Generates the upload path for the back of the identity document.
+    Example: identity_documents/2025/11/some_filename.jpg
+    """
+    date_path = datetime.now().strftime('%Y/%m')
+    host_id = instance.eygar_host.id
+    return f"hosts/{host_id}/identity_documents/{date_path}/{filename}"
+
+
 class IdentityVerification(models.Model):
     DOCUMENT_TYPES = [
         ('national_id', 'National ID'),
@@ -144,8 +198,19 @@ class IdentityVerification(models.Model):
     # Document Information
     document_type = models.CharField(max_length=20, choices=DOCUMENT_TYPES)
     document_number = models.CharField(max_length=50)
-    document_image_front = models.ImageField(upload_to='identity_documents/%Y/%m/')
-    document_image_back = models.ImageField(upload_to='identity_documents/%Y/%m/', null=True, blank=True)
+    # document_image_front = models.ImageField(upload_to='identity_documents/%Y/%m/')
+    # document_image_back = models.ImageField(upload_to='identity_documents/%Y/%m/', null=True, blank=True)
+
+    document_image_front = models.ImageField(
+        upload_to=get_document_front_upload_path,
+        storage=S3MediaStorage()
+    )
+    document_image_back = models.ImageField(
+        upload_to=get_document_back_upload_path,
+        storage=S3MediaStorage(),
+        null=True,
+        blank=True
+    )
 
     # Verification Status
     verification_status = models.CharField(max_length=20, choices=VERIFICATION_STATUS, default='pending')
@@ -305,7 +370,7 @@ class VendorProfile(models.Model):
 
     def __str__(self):
         return f"Vendor Profile - {self.user.username}"
-    
+
     @property
     def completion_percentage(self):
         steps = [

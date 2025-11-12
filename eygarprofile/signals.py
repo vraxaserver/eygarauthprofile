@@ -5,7 +5,9 @@ from django.conf import settings
 from django.utils import timezone
 from django.db.models import Q
 from .models import EygarHost, ProfileStatusHistory
-
+from conf.utils.aws_utils import send_email_to_sqs
+import logging
+logger = logging.getLogger(__name__)
 
 @receiver(pre_save, sender=EygarHost)
 def track_status_changes(sender, instance, **kwargs):
@@ -26,7 +28,7 @@ def handle_status_change(sender, instance, created, **kwargs):
     if not created and hasattr(instance, '_old_status'):
         old_status = instance._old_status
         new_status = instance.status
-        
+
         if old_status != new_status:
             # Create status history record
             ProfileStatusHistory.objects.create(
@@ -36,15 +38,15 @@ def handle_status_change(sender, instance, created, **kwargs):
                 changed_by=getattr(instance, 'reviewer', None),
                 change_reason=f'Status changed from {old_status} to {new_status}'
             )
-            
+
             # Send email notification for status changes
             send_status_change_email(instance, old_status, new_status)
 
 
 def send_status_change_email(eygar_host, old_status, new_status):
-    """Send email notification when profile status changes"""
+    """Queue an email notification when a profile status changes"""
     user = eygar_host.user
-    
+
     status_messages = {
         'approved': {
             'subject': 'Congratulations! Your Host Profile Has Been Approved',
@@ -153,16 +155,14 @@ def send_status_change_email(eygar_host, old_status, new_status):
             """
         }
     }
-    
+
     email_content = status_messages.get(new_status)
     if email_content:
         try:
-            send_mail(
+            send_email_to_sqs(
                 subject=email_content['subject'],
                 message=email_content['message'],
-                from_email=settings.DEFAULT_FROM_EMAIL,
                 recipient_list=[user.email],
-                fail_silently=False,
             )
         except Exception as e:
             # Log the error but don't raise it
@@ -177,18 +177,18 @@ def notify_admins_on_submission(sender, instance, created, **kwargs):
     if not created and hasattr(instance, '_old_status'):
         old_status = instance._old_status
         new_status = instance.status
-        
+
         if old_status != 'submitted' and new_status == 'submitted':
             # Send notification to admin/moderators
             try:
                 from django.contrib.auth import get_user_model
                 User = get_user_model()
-                
+
                 # Get all admin users
                 admin_users = User.objects.filter(
                     Q(is_staff=True) | Q(is_superuser=True)
                 ).values_list('email', flat=True)
-                
+
                 if admin_users:
                     subject = f"New Host Profile Submitted for Review"
                     message = f"""
@@ -202,15 +202,13 @@ def notify_admins_on_submission(sender, instance, created, **kwargs):
 
                     Admin Panel: {settings.ADMIN_URL if hasattr(settings, 'ADMIN_URL') else '/admin/'}
                     """
-                    
-                    send_mail(
+
+                    send_email_to_sqs(
                         subject=subject,
                         message=message,
-                        from_email=settings.DEFAULT_FROM_EMAIL,
-                        recipient_list=list(admin_users),
-                        fail_silently=True,
+                        recipient_list=admin_emails,
                     )
-                    
+
             except Exception as e:
                 # Log the error but don't raise it
                 import logging

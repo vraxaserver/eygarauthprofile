@@ -40,7 +40,8 @@ class RegisterView(generics.CreateAPIView):
     def perform_create(self, serializer):
         user = serializer.save()
         token = make_token(user)
-        activation_url = f"{settings.SITE_URL}{reverse('accounts:activate')}?token={token}"
+        # activation_url = f"{settings.SITE_URL}{reverse('accounts:activate')}?token={token}"
+        activation_url = f"{settings.SITE_URL}/activate?token={token}"
         # subject = "Activate your account"
         # message = f"Click here to activate your account: {activation_url}"
         email_payload = {

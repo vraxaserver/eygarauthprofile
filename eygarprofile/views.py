@@ -323,6 +323,7 @@ class EygarHostViewSet(ViewSet):
                     profile.review_submission_completed = True
                     profile.status = 'submitted'
                     profile.submitted_at = timezone.now()
+                    profile.current_step = 'completed'
                     profile.save()
 
                     # Create status history

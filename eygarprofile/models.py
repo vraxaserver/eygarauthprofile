@@ -4,6 +4,7 @@ from django.core.validators import RegexValidator
 from django.utils import timezone
 import uuid
 import os
+from datetime import datetime
 
 from conf.utils.aws_utils import upload_fileobj_to_s3, upload_to_eygar_host
 from conf.storages import S3MediaStorage
@@ -168,7 +169,7 @@ def get_document_front_upload_path(instance, filename):
     """
     date_path = datetime.now().strftime('%Y/%m')
     host_id = instance.eygar_host.id
-    return f"hosts/{host_id}/identity_documents/{date_path}/{filename}"
+    return f"hosts/{host_id}/identity_documents/{filename}"
 
 # A callable to generate the upload path for the identity document back image.
 def get_document_back_upload_path(instance, filename):
@@ -178,7 +179,7 @@ def get_document_back_upload_path(instance, filename):
     """
     date_path = datetime.now().strftime('%Y/%m')
     host_id = instance.eygar_host.id
-    return f"hosts/{host_id}/identity_documents/{date_path}/{filename}"
+    return f"hosts/{host_id}/identity_documents/{filename}"
 
 
 class IdentityVerification(models.Model):

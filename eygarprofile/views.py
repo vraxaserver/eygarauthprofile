@@ -709,7 +709,12 @@ class VendorProfileViewSet(ModelViewSet):
             )
         try:
             with transaction.atomic():
-                serializer = ServiceAreaSerializer(data=request.data)
+                service_area_obj, created = ServiceArea.objects.get_or_create(
+                    vendor_profile=profile
+                )
+                serializer = ServiceAreaSerializer(
+                    service_area_obj, data=request.data, partial=True
+                )
                 if serializer.is_valid():
                     serializer.save(vendor_profile=profile)
                     profile.service_area_completed = True
@@ -730,7 +735,6 @@ class VendorProfileViewSet(ModelViewSet):
     @action(detail=False, methods=['post'])
     def contact_details(self, request):
         """Create or update contact details (Step 3)."""
-        import pdb; pdb.set_trace()
         profile = self.get_eygar_vendor()
         if not profile.service_area_completed:
             return Response(

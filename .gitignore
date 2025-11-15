@@ -1,0 +1,13 @@
+.venv
+.env
+.idea
+
+**/*.log
+**/*.pyc
+**/__pycache__
+
+db*
+
+media
+test_media
+staticfiles

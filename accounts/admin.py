@@ -37,6 +37,7 @@ class CustomUserAdmin(BaseUserAdmin):
         "is_superuser",
         "is_active",
         "is_email_verified",
+        "stripe_customer_id",
         "created_at",
     )
     list_filter = ("is_staff", "is_superuser", "is_active", "is_email_verified", "groups")
@@ -45,7 +46,7 @@ class CustomUserAdmin(BaseUserAdmin):
 
     fieldsets = (
         (None, {"fields": ("email", "username", "password")}),
-        (_("Personal info"), {"fields": ("avatar", "avatar_preview")}),
+        (_("Personal info"), {"fields": ("avatar", "avatar_preview", "stripe_customer_id")}),
         (_("Permissions"), {"fields": ("is_active", "is_staff", "is_superuser", "is_email_verified", "groups", "user_permissions")}),
         (_("Important dates"), {"fields": ("last_login", "created_at", "updated_at")}),
     )

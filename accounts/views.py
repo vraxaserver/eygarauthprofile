@@ -15,6 +15,11 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from conf.utils.aws_utils import upload_fileobj_to_s3
+
+import stripe
+
+stripe.api_key = settings.STRIPE_SECRET_KEY
+
 import pdb
 
 User = get_user_model()
@@ -70,9 +75,45 @@ class ActivateView(APIView):
         except User.DoesNotExist:
             return Response({"detail": "User not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        user.is_active = True
-        user.is_email_verified = True
-        user.save()
+        # Make activation + Stripe customer creation atomic and safe for retries
+        try:
+            with transaction.atomic():
+                # If already activated/verified, still ensure Stripe customer exists (idempotent)
+                user.is_active = True
+                user.is_email_verified = True
+
+                # Create Stripe customer only once
+                if not user.stripe_customer_id:
+                    # Idempotency key prevents duplicates if your endpoint is hit twice quickly
+                    idempotency_key = f"user-activate-{user.pk}"
+
+                    customer = stripe.Customer.create(
+                        email=user.email,
+                        name=getattr(user, "get_full_name", lambda: "")() or None,
+                        metadata={
+                            "user_id": str(user.pk),
+                            "source": "auth-service-activation",
+                        },
+                        idempotency_key=idempotency_key,
+                    )
+
+                    user.stripe_customer_id = customer["id"]
+
+                user.save(
+                    update_fields=["is_active", "is_email_verified", "stripe_customer_id"]
+                )
+
+        except stripe.error.StripeError as e:
+            # Activation can either fail entirely (strict) or succeed without Stripe (lenient).
+            # This implementation is strict: if Stripe fails, we return an error.
+            return Response(
+                {
+                    "detail": "Account activation failed while creating Stripe customer.",
+                    "stripe_error": str(e),
+                },
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
         return Response({"detail": "Account activated"})
 
 

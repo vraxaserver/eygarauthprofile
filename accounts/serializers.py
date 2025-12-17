@@ -29,7 +29,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ("id", "email", "avatar_url", "first_name", "last_name", "is_email_verified", "created_at", "updated_at")
+        fields = ("id", "email", "avatar_url", "first_name", "last_name", "is_email_verified", "stripe_customer_id",  "created_at", "updated_at")
 
 
 class ChangePasswordSerializer(serializers.Serializer):
@@ -52,6 +52,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "last_name",
             "avatar_url",
             "is_email_verified",
+            "stripe_customer_id",
             "is_staff",
             "is_superuser",
             "is_active",

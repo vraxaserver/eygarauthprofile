@@ -38,6 +38,8 @@ class User(AbstractUser):
     is_host_verified = models.BooleanField(default=False)
     is_vendor_verified = models.BooleanField(default=False)
 
+    stripe_customer_id = models.CharField(max_length=255, blank=True, null=True, db_index=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

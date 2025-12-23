@@ -6,7 +6,7 @@ load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.getenv('SECRET_KEY', default='your-secret-key-here')
+SECRET_KEY = os.getenv('SECRET_KEY', default='67f79f54a85671dce02e3d8c3fc5e0b2')
 
 STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', default='your-secret-key-here')
 

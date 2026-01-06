@@ -225,6 +225,7 @@ DOCUMENT_VERIFICATION_API_URL = os.getenv('DOCUMENT_VERIFICATION_API_URL', defau
 
 # Frontend URL
 FRONTEND_URL = os.getenv('SITE_URL', default='http://localhost:3000')
+SITE_URL = FRONTEND_URL
 ADMIN_URL = '/admin/'
 
 # Logging Configuration

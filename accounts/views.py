@@ -1,8 +1,7 @@
 # accounts/views.py
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.urls import reverse
-from django.core.mail import send_mail
+from django.db import transaction
 from rest_framework import generics, status, permissions, serializers
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -60,11 +59,9 @@ class RegisterView(generics.CreateAPIView):
             to_email=user.email,
             subject=email_payload['subject'],
             message=email_payload['message'],
-            from_email=email_payload['from_email'],
-            extra_payload=email_payload['extra_payload'],
+            from_email=email_payload['from_email']
         )
         
-
 
 
 class ActivateView(APIView):

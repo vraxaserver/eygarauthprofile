@@ -9,7 +9,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.conf import settings
 import random
-from conf.utils.aws_utils import send_app_email
+from conf.utils.email import send_app_email
 import string
 
 User = get_user_model()

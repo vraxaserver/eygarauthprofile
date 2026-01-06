@@ -1,0 +1,19 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: eygarauth
+    env_file:
+      - ./.env
+    environment:
+      # Optional, only if you use multiple settings modules
+      # DJANGO_SETTINGS_MODULE: conf.settings
+      PYTHONUNBUFFERED: "1"
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+volumes:
+  static_data:
+  media_data:

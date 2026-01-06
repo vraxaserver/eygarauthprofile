@@ -1,8 +1,11 @@
 import requests
 import logging
 from django.conf import settings
+from conf.utils.email import send_app_email
 from typing import Dict, Any
 import re
+from twilio.rest import Client
+
 
 logger = logging.getLogger(__name__)
 
@@ -13,15 +16,13 @@ def send_sms_verification(phone_number: str, verification_code: str) -> bool:
     This is a placeholder implementation - integrate with your SMS provider.
     """
     try:
-        # Example integration with Twilio
-        # from twilio.rest import Client
         
-        # client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
-        # message = client.messages.create(
-        #     body=f"Your verification code is: {verification_code}",
-        #     from_=settings.TWILIO_PHONE_NUMBER,
-        #     to=phone_number
-        # )
+        client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
+        message = client.messages.create(
+            body=f"Your verification code is: {verification_code}",
+            from_=settings.TWILIO_PHONE_NUMBER,
+            to=phone_number
+        )
         
         # For development/testing, just log the code
         logger.info(f"SMS Verification code for {phone_number}: {verification_code}")
@@ -192,7 +193,7 @@ def send_email_verification(email: str, verification_token: str) -> bool:
         This link will expire in 24 hours.
         """
         
-        send_mail(
+        send_app_email(
             subject,
             message,
             settings.DEFAULT_FROM_EMAIL,
@@ -277,3 +278,4 @@ def calculate_profile_completeness(eygar_host) -> Dict[str, Any]:
         'missing_fields': missing_fields,
         'completeness_percentage': round(completeness_percentage, 2)
     }
+    

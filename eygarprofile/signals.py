@@ -5,7 +5,7 @@ from django.conf import settings
 from django.utils import timezone
 from django.db.models import Q
 from .models import EygarHost, ProfileStatusHistory
-from conf.utils.aws_utils import send_email_to_sqs
+from conf.utils.email import send_app_email 
 import logging
 logger = logging.getLogger(__name__)
 
@@ -159,10 +159,10 @@ def send_status_change_email(eygar_host, old_status, new_status):
     email_content = status_messages.get(new_status)
     if email_content:
         try:
-            send_email_to_sqs(
+            send_app_email(
                 subject=email_content['subject'],
                 message=email_content['message'],
-                recipient_list=[user.email],
+                to_email=user.email,
             )
         except Exception as e:
             # Log the error but don't raise it
@@ -203,10 +203,10 @@ def notify_admins_on_submission(sender, instance, created, **kwargs):
                     Admin Panel: {settings.ADMIN_URL if hasattr(settings, 'ADMIN_URL') else '/admin/'}
                     """
 
-                    send_email_to_sqs(
+                    send_app_email(
                         subject=subject,
                         message=message,
-                        recipient_list=admin_emails,
+                        to_email=admin_emails,
                     )
 
             except Exception as e:

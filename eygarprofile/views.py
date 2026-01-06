@@ -7,10 +7,9 @@ from django.shortcuts import get_object_or_404
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
-from django.core.mail import send_mail
 from django.conf import settings
 import random
-from conf.utils.aws_utils import publish_to_sqs, send_email_to_sqs
+from conf.utils.aws_utils import send_app_email
 import string
 
 User = get_user_model()
@@ -402,10 +401,10 @@ class EygarHostViewSet(ViewSet):
         The Review Team
         """
 
-        send_email_to_sqs(
+        send_app_email(
             subject=subject,
             message=message,
-            recipient_list=[profile.user.email],
+            to_email=profile.user.email,
         )
 
     def notify_admins_new_submission(self, profile):
@@ -577,12 +576,11 @@ class AdminReviewViewSet(ViewSet):
         The Review Team
         """
 
-        send_mail(
+        send_app_email(
             subject,
             message,
             settings.DEFAULT_FROM_EMAIL,
-            [profile.user.email],
-            fail_silently=True,
+            to_email=profile.user.email,
         )
 
 
@@ -815,20 +813,12 @@ class VendorProfileViewSet(ModelViewSet):
         Best regards,
         The Review Team
         """
-        send_mail(
+        send_app_email(
             subject,
             message,
             settings.DEFAULT_FROM_EMAIL,
-            [profile.user.email],
-            fail_silently=True,
+            to_email=profile.user.email,
         )
-        email_payload = {
-            'from_email': settings.DEFAULT_FROM_EMAIL,
-            'to_email': profile.user.email,
-            'subject': subject,
-            'message': message
-        }
-        publish_to_sqs(email_payload)
 
     def notify_admins_new_submission(self, profile):
         """Notify admins about new profile submission."""

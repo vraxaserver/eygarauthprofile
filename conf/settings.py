@@ -3,6 +3,8 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 
+
+ENV = os.getenv('ENV', default='dev')
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -12,6 +14,7 @@ STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', default='your-secret-key-here
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', default=True)
+
 
 ALLOWED_HOSTS = ['*']
 
@@ -185,9 +188,6 @@ EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', default='vraxa.server@gmail.com')
 
 
-# Site url used to build activation link
-SITE_URL = os.getenv('SITE_URL', 'http://localhost:3000')
-
 # AWS Configuration
 AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
 AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
@@ -200,6 +200,11 @@ AWS_S3_CUSTOM_DOMAIN = f"{AWS_S3_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.
 AWS_SQS_EMAIL_QUEUE_URL = os.getenv("AWS_SQS_EMAIL_QUEUE_URL")
 
 MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/'
+
+
+TWILIO_AUTH_TOKEN=os.getenv('TWILIO_AUTH_TOKEN')
+TWILIO_ACCOUNT_SID=os.getenv('TWILIO_ACCOUNT_SID')
+TWILIO_PHONE_NUMBER=os.getenv('TWILIO_PHONE_NUMBER')
 
 
 # DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
@@ -219,7 +224,7 @@ DOCUMENT_VERIFICATION_API_KEY = os.getenv('DOCUMENT_VERIFICATION_API_KEY', defau
 DOCUMENT_VERIFICATION_API_URL = os.getenv('DOCUMENT_VERIFICATION_API_URL', default='')
 
 # Frontend URL
-FRONTEND_URL = os.getenv('FRONTEND_URL', default='http://localhost:3000')
+FRONTEND_URL = os.getenv('SITE_URL', default='http://localhost:3000')
 ADMIN_URL = '/admin/'
 
 # Logging Configuration

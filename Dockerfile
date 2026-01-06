@@ -1,78 +1,45 @@
-# ---------- Builder stage: build wheels ----------
-FROM python:3.12-slim-bullseye AS builder
+# Dockerfile
+FROM python:3.12-slim
 
-ENV PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    POETRY_VIRTUALENVS_CREATE=false
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
-WORKDIR /build
-
+# System deps: build tools + postgres libs (psycopg), plus curl for debugging/health
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
-    gcc \
     libpq-dev \
-    python3-dev \
-    libffi-dev \
-    ca-certificates \
     curl \
- && rm -rf /var/lib/apt/lists/*
-
-COPY requirements.txt .
-RUN python -m pip install --upgrade pip setuptools wheel \
- && pip wheel --no-deps --wheel-dir /wheels -r requirements.txt
-
-COPY . /build/app
-
-
-# ---------- Runtime stage: minimal runtime ----------
-FROM python:3.12-slim-bullseye AS runtime
-
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PATH="/opt/venv/bin:$PATH" \
-    DJANGO_SETTINGS_MODULE=conf.settings
+  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 \
-    tini \
-    ca-certificates \
-    curl \
- && rm -rf /var/lib/apt/lists/*
+# Create non-root user
+RUN useradd -m -u 10001 django
 
-ARG APP_USER=appuser
-ARG APP_UID=1000
-RUN groupadd -g ${APP_UID} ${APP_USER} \
- && useradd -m -u ${APP_UID} -g ${APP_UID} ${APP_USER}
+# Install Python deps first (better caching)
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir --upgrade pip \
+ && pip install --no-cache-dir -r /app/requirements.txt
 
-COPY --from=builder /wheels /wheels
-COPY --from=builder --chown=${APP_USER}:${APP_USER} /build/app /app
+# Copy project
+COPY . /app
 
-RUN python -m venv /opt/venv \
- && /opt/venv/bin/pip install --upgrade pip \
- && /opt/venv/bin/pip install --no-index --find-links /wheels -r requirements.txt \
-    || /opt/venv/bin/pip install --no-cache-dir -r requirements.txt \
- && rm -rf /wheels /root/.cache/pip
+# Prepare writable dirs (staticfiles is used by collectstatic, logs for FileHandler)
+RUN mkdir -p /app/staticfiles /app/logs \
+ && chown -R django:django /app
 
-# 👇 Add this: collect static files during image build
-RUN /opt/venv/bin/python manage.py collectstatic --noinput
+USER django
 
-# Copy entrypoint
-COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+# Collect static at build-time for WhiteNoise manifest storage.
+# This requires env vars that allow Django settings import:
+# - SECRET_KEY can be dummy for collectstatic
+# - DB env is not required for collectstatic unless your code hits DB at import time
+ENV SECRET_KEY="build-time-secret-key" \
+    DEBUG="False"
 
-RUN chown -R ${APP_USER}:${APP_USER} /app
-
-USER root
+RUN python manage.py collectstatic --noinput
 
 EXPOSE 8000
-STOPSIGNAL SIGTERM
 
-# ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/docker-entrypoint.sh"]
-
-# Gunicorn serves via Whitenoise (no need for nginx if using Whitenoise)
-CMD ["gunicorn", "conf.asgi:application", "-w", "3", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:8000", "--log-level", "info"]
+# WSGI module is "conf.wsgi.application" as in your settings.
+CMD ["gunicorn", "conf.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--threads", "2", "--timeout", "60", "--access-logfile", "-", "--error-logfile", "-"]

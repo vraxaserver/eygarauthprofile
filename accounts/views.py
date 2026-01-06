@@ -9,7 +9,7 @@ from rest_framework.response import Response
 
 from .serializers import RegisterSerializer, UserSerializer, ChangePasswordSerializer, UserProfileSerializer
 from .tokens import make_token, parse_token
-from conf.utils.aws_utils import publish_to_sqs
+from conf.utils.email import send_app_email
 
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -56,9 +56,15 @@ class RegisterView(generics.CreateAPIView):
             'message': f"Click here to activate your account: {activation_url}"
         }
         # pdb.set_trace()
-        publish_to_sqs(email_payload)
+        send_app_email(
+            to_email=user.email,
+            subject=email_payload['subject'],
+            message=email_payload['message'],
+            from_email=email_payload['from_email'],
+            extra_payload=email_payload['extra_payload'],
+        )
+        
 
-        # send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [user.email])
 
 
 class ActivateView(APIView):

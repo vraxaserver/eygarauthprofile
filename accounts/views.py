@@ -1,140 +1,259 @@
 # accounts/views.py
+"""
+Thin API views — all business logic delegated to application services.
+Views handle HTTP concerns: request parsing, response formatting, status codes.
+"""
+import logging
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.db import transaction
-from rest_framework import generics, status, permissions, serializers
-from rest_framework.views import APIView
+from rest_framework import generics, permissions, status
 from rest_framework.response import Response
-
-from .serializers import RegisterSerializer, UserSerializer, ChangePasswordSerializer, UserProfileSerializer
-from .tokens import make_token, parse_token
-from conf.utils.email import send_app_email
-
-from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.views import TokenRefreshView  # noqa: F401 — re-exported for URL wiring
+
+from accounts.application.dto import (
+    ForgotPasswordDTO,
+    GuestProfileUpdateDTO,
+    LoginDTO,
+    RegisterDTO,
+    ResendCodeDTO,
+    ResetPasswordDTO,
+    SocialAuthDTO,
+    VerifyCodeDTO,
+)
+from accounts.application.services.auth_service import AuthService
+from accounts.application.services.guest_profile_service import GuestProfileService
+from accounts.application.services.password_service import PasswordService
+from accounts.application.services.registration_service import RegistrationService
+from accounts.application.services.social_auth_service import SocialAuthService
+from accounts.application.services.verification_service import VerificationService
+from accounts.domain.exceptions import DomainException
+from accounts.serializers import (
+    ChangePasswordSerializer,
+    ForgotPasswordSerializer,
+    GuestProfileSerializer,
+    LoginSerializer,
+    RegisterSerializer,
+    ResendCodeSerializer,
+    ResetPasswordSerializer,
+    SocialAuthSerializer,
+    UserProfileSerializer,
+    UserSerializer,
+    VerifyCodeSerializer,
+)
 from conf.utils.aws_utils import upload_fileobj_to_s3
 
-import stripe
-
-stripe.api_key = settings.STRIPE_SECRET_KEY
-
-import pdb
-
+logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
-class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
-    def validate(self, attrs):
-        data = super().validate(attrs)
-        if not self.user.is_email_verified:
-            raise serializers.ValidationError("Please verify your email before logging in.")
-        data["user"] = UserSerializer(self.user).data
-        return data
+def _error_response(exc: DomainException, http_status=status.HTTP_400_BAD_REQUEST):
+    """Convert a DomainException to a DRF Response."""
+    return Response(
+        {'error': exc.message, 'code': exc.code},
+        status=http_status,
+    )
 
 
-class MyTokenObtainPairView(TokenObtainPairView):
-    serializer_class = MyTokenObtainPairSerializer
+# ---------------------------------------------------------------------------
+# Registration & Verification
+# ---------------------------------------------------------------------------
 
-
-class RegisterView(generics.CreateAPIView):
+class RegisterView(APIView):
+    """POST /api/v1/auth/register/"""
+    permission_classes = [permissions.AllowAny]
     serializer_class = RegisterSerializer
-    permission_classes = [permissions.AllowAny]
 
-    def perform_create(self, serializer):
-        user = serializer.save()
-        token = make_token(user)
-        # activation_url = f"{settings.SITE_URL}{reverse('accounts:activate')}?token={token}"
-        activation_url = f"{settings.SITE_URL}/activate?token={token}"
-        # subject = "Activate your account"
-        # message = f"Click here to activate your account: {activation_url}"
-        email_payload = {
-            'from_email': settings.DEFAULT_FROM_EMAIL,
-            'to_emails': [user.email],
-            'subject': "Activate your account",
-            'message': f"Click here to activate your account: {activation_url}"
-        }
-        # pdb.set_trace()
-        send_app_email(
-            to_email=user.email,
-            subject=email_payload['subject'],
-            message=email_payload['message'],
-            from_email=email_payload['from_email']
-        )
-        
+    def post(self, request):
+        serializer = RegisterSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
-
-class ActivateView(APIView):
-    permission_classes = [permissions.AllowAny]
-
-    def get(self, request):
-        token = request.query_params.get("token")
-        data = parse_token(token)
-        if not data:
-            return Response({"detail": "Invalid or expired token"}, status=status.HTTP_400_BAD_REQUEST)
+        dto = RegisterDTO(**serializer.validated_data)
 
         try:
-            user = User.objects.get(pk=data["user_id"])
-        except User.DoesNotExist:
-            return Response({"detail": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+            result = RegistrationService().register(dto)
+        except DomainException as e:
+            return _error_response(e)
 
-        # Make activation + Stripe customer creation atomic and safe for retries
+        return Response(result, status=status.HTTP_201_CREATED)
+
+
+class VerifyCodeView(APIView):
+    """POST /api/v1/auth/verify/"""
+    permission_classes = [permissions.AllowAny]
+    serializer_class = VerifyCodeSerializer
+
+    def post(self, request):
+        serializer = VerifyCodeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        dto = VerifyCodeDTO(**serializer.validated_data)
+
         try:
-            with transaction.atomic():
-                # If already activated/verified, still ensure Stripe customer exists (idempotent)
-                user.is_active = True
-                user.is_email_verified = True
+            result = VerificationService().verify_code(dto)
+        except DomainException as e:
+            return _error_response(e)
 
-                # Create Stripe customer only once
-                if not user.stripe_customer_id:
-                    # Idempotency key prevents duplicates if your endpoint is hit twice quickly
-                    idempotency_key = f"user-activate-{user.pk}"
+        return Response(result, status=status.HTTP_200_OK)
 
-                    customer = stripe.Customer.create(
-                        email=user.email,
-                        name=getattr(user, "get_full_name", lambda: "")() or None,
-                        metadata={
-                            "user_id": str(user.pk),
-                            "source": "auth-service-activation",
-                        },
-                        idempotency_key=idempotency_key,
-                    )
 
-                    user.stripe_customer_id = customer["id"]
+class ResendCodeView(APIView):
+    """POST /api/v1/auth/verify/resend/"""
+    permission_classes = [permissions.AllowAny]
+    serializer_class = ResendCodeSerializer
 
-                user.save(
-                    update_fields=["is_active", "is_email_verified", "stripe_customer_id"]
-                )
+    def post(self, request):
+        serializer = ResendCodeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
-        except stripe.error.StripeError as e:
-            # Activation can either fail entirely (strict) or succeed without Stripe (lenient).
-            # This implementation is strict: if Stripe fails, we return an error.
-            return Response(
-                {
-                    "detail": "Account activation failed while creating Stripe customer.",
-                    "stripe_error": str(e),
-                },
-                status=status.HTTP_502_BAD_GATEWAY,
-            )
+        dto = ResendCodeDTO(**serializer.validated_data)
 
-        return Response({"detail": "Account activated"})
+        try:
+            result = VerificationService().resend_code(dto)
+        except DomainException as e:
+            return _error_response(e)
+
+        return Response(result, status=status.HTTP_200_OK)
+
+
+# ---------------------------------------------------------------------------
+# Authentication
+# ---------------------------------------------------------------------------
+
+class LoginView(APIView):
+    """POST /api/v1/auth/login/"""
+    permission_classes = [permissions.AllowAny]
+    serializer_class = LoginSerializer
+
+    def post(self, request):
+        serializer = LoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        dto = LoginDTO(**serializer.validated_data)
+
+        try:
+            result = AuthService().login(dto)
+        except DomainException as e:
+            return _error_response(e, http_status=status.HTTP_401_UNAUTHORIZED)
+
+        return Response(result, status=status.HTTP_200_OK)
 
 
 class LogoutView(APIView):
+    """POST /api/v1/auth/logout/"""
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
-        refresh = request.data.get("refresh")
+        refresh = request.data.get('refresh')
         if not refresh:
-            return Response({"detail": "Refresh token required"}, status=400)
+            return Response(
+                {'error': 'Refresh token required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         try:
             RefreshToken(refresh).blacklist()
         except Exception:
-            return Response({"detail": "Invalid token"}, status=400)
-        return Response(status=204)
+            return Response(
+                {'error': 'Invalid token.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
+
+# ---------------------------------------------------------------------------
+# Password Management
+# ---------------------------------------------------------------------------
+
+class ForgotPasswordView(APIView):
+    """POST /api/v1/auth/password/forgot/"""
+    permission_classes = [permissions.AllowAny]
+    serializer_class = ForgotPasswordSerializer
+
+    def post(self, request):
+        serializer = ForgotPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        dto = ForgotPasswordDTO(**serializer.validated_data)
+
+        try:
+            result = PasswordService().forgot_password(dto)
+        except DomainException as e:
+            return _error_response(e)
+
+        return Response(result, status=status.HTTP_200_OK)
+
+
+class ResetPasswordView(APIView):
+    """POST /api/v1/auth/password/reset/"""
+    permission_classes = [permissions.AllowAny]
+    serializer_class = ResetPasswordSerializer
+
+    def post(self, request):
+        serializer = ResetPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        dto = ResetPasswordDTO(**serializer.validated_data)
+
+        try:
+            result = PasswordService().reset_password(dto)
+        except DomainException as e:
+            return _error_response(e)
+
+        return Response(result, status=status.HTTP_200_OK)
+
+
+class ChangePasswordView(APIView):
+    """POST /api/v1/auth/password/change/"""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = request.user
+        if not user.check_password(serializer.validated_data['old_password']):
+            return Response(
+                {'error': 'Current password is incorrect.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user.set_password(serializer.validated_data['new_password'])
+        user.save(update_fields=['password'])
+
+        return Response({'message': 'Password changed successfully.'})
+
+
+# ---------------------------------------------------------------------------
+# Social Auth
+# ---------------------------------------------------------------------------
+
+class SocialAuthView(APIView):
+    """POST /api/v1/auth/social/login/"""
+    permission_classes = [permissions.AllowAny]
+    serializer_class = SocialAuthSerializer
+
+    def post(self, request):
+        serializer = SocialAuthSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        dto = SocialAuthDTO(**serializer.validated_data)
+
+        try:
+            result = SocialAuthService().authenticate(dto)
+        except DomainException as e:
+            return _error_response(e, http_status=status.HTTP_401_UNAUTHORIZED)
+
+        return Response(result, status=status.HTTP_200_OK)
+
+
+# ---------------------------------------------------------------------------
+# User / Profile
+# ---------------------------------------------------------------------------
 
 class MyView(generics.RetrieveUpdateAPIView):
+    """GET/PATCH /api/v1/auth/me/"""
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -143,20 +262,14 @@ class MyView(generics.RetrieveUpdateAPIView):
 
     def update(self, request, *args, **kwargs):
         user = self.get_object()
-        data = request.data.copy()  # QueryDict -> mutable copy
+        data = request.data.copy()
 
-        # If there's an avatar file in the request, upload it to S3 first
-        avatar_file = request.FILES.get("avatar", None)
+        # Handle avatar upload to S3
+        avatar_file = request.FILES.get('avatar')
         if avatar_file:
-            # Use a path that groups by user id
             key_prefix = f"avatars/{user.id}/"
-            url, key = upload_fileobj_to_s3(avatar_file, key_prefix=key_prefix)
-            # Put the S3 URL into the update payload
-            data["avatar_url"] = url
-
-            # Optional: If you want to store a local copy in avatar ImageField, you could:
-            # user.avatar.save(avatar_file.name, avatar_file, save=False)
-            # but typically we keep only avatar_url when using S3.
+            url, _key = upload_fileobj_to_s3(avatar_file, key_prefix=key_prefix)
+            data['avatar_url'] = url
 
         serializer = self.get_serializer(user, data=data, partial=True)
         serializer.is_valid(raise_exception=True)
@@ -166,6 +279,7 @@ class MyView(generics.RetrieveUpdateAPIView):
 
 
 class MyProfileView(generics.RetrieveUpdateAPIView):
+    """GET/PATCH /api/v1/auth/profile/"""
     serializer_class = UserProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -173,16 +287,32 @@ class MyProfileView(generics.RetrieveUpdateAPIView):
         return self.request.user
 
 
-class ChangePasswordView(APIView):
+class GuestProfileView(APIView):
+    """GET/PATCH /api/v1/auth/guest-profile/"""
     permission_classes = [permissions.IsAuthenticated]
 
-    def post(self, request):
-        serializer = ChangePasswordSerializer(data=request.data)
-        if serializer.is_valid():
-            user = request.user
-            if not user.check_password(serializer.validated_data["old_password"]):
-                return Response({"old_password": "Wrong password"}, status=400)
-            user.set_password(serializer.validated_data["new_password"])
-            user.save()
-            return Response({"detail": "Password changed"})
-        return Response(serializer.errors, status=400)
+    def get(self, request):
+        try:
+            result = GuestProfileService().get_profile(request.user)
+        except DomainException as e:
+            return _error_response(e, http_status=status.HTTP_404_NOT_FOUND)
+
+        return Response(result, status=status.HTTP_200_OK)
+
+    def patch(self, request):
+        serializer = GuestProfileSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+
+        dto = GuestProfileUpdateDTO(**serializer.validated_data)
+        avatar_file = request.FILES.get('avatar')
+
+        try:
+            result = GuestProfileService().update_profile(
+                user=request.user,
+                dto=dto,
+                avatar_file=avatar_file,
+            )
+        except DomainException as e:
+            return _error_response(e)
+
+        return Response(result, status=status.HTTP_200_OK)

@@ -19,3 +19,29 @@ TWILIO_AUTH_TOKEN = 'test'
 PASSWORD_HASHERS = [
     'django.contrib.auth.hashers.MD5PasswordHasher',
 ]
+
+# Disable real AWS calls in tests
+AWS_ACCESS_KEY_ID = 'test-key'
+AWS_SECRET_ACCESS_KEY = 'test-secret'
+AWS_REGION_NAME = 'us-east-1'
+SNS_TOPIC_ARN = 'arn:aws:sns:us-east-1:000000000000:test-topic'
+SNS_AUTH_EVENTS_TOPIC_ARN = SNS_TOPIC_ARN
+SNS_NOTIFICATION_TOPIC_ARN = SNS_TOPIC_ARN
+AWS_S3_BUCKET_NAME = 'test-bucket'
+
+# Social auth test credentials
+SOCIAL_AUTH_GOOGLE_CLIENT_ID = 'test-google-client-id'
+SOCIAL_AUTH_GOOGLE_CLIENT_SECRET = 'test-google-secret'
+SOCIAL_AUTH_FACEBOOK_APP_ID = 'test-facebook-app-id'
+SOCIAL_AUTH_FACEBOOK_APP_SECRET = 'test-facebook-secret'
+
+# Stripe disabled in tests by default
+STRIPE_ENABLED = False
+STRIPE_SECRET_KEY = 'sk_test_fake_key'
+
+# Override ENV so email utility uses direct mode
+ENV = 'local'
+DEBUG = True
+
+# Disable migration checks for faster tests
+DISABLE_MIGRATIONS = None

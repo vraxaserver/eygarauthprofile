@@ -10,6 +10,7 @@ from django.utils import timezone
 from django.conf import settings
 import random
 from conf.utils.email import send_app_email
+from eygarprofile.application.services.host_profile_service import HostProfileService
 import string
 
 User = get_user_model()
@@ -334,11 +335,8 @@ class EygarHostViewSet(ViewSet):
                         change_reason='Profile submitted for review'
                     )
 
-                    # Send email notification to user
-                    self.send_submission_email(profile)
-
-                    # Send notification to admins/moderators
-                    self.notify_admins_new_submission(profile)
+                    # Publish HostProfileCreated event and send notifications
+                    HostProfileService().on_profile_submitted(profile)
 
                     return Response({
                         'message': 'Profile submitted for review successfully',
@@ -541,8 +539,13 @@ class AdminReviewViewSet(ViewSet):
                     change_reason=review_notes
                 )
 
-                # Send email notification to user
-                self.send_review_result_email(profile, new_status, review_notes)
+                # Publish events and send notifications via HostProfileService
+                HostProfileService().on_status_changed(
+                    eygar_host=profile,
+                    old_status=old_status,
+                    new_status=new_status,
+                    review_notes=review_notes,
+                )
 
                 return Response({
                     'message': f'Profile {new_status} successfully',
@@ -552,7 +555,7 @@ class AdminReviewViewSet(ViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def send_review_result_email(self, profile, status, review_notes):
-        """Send email notification about review result"""
+        """Send email notification about review result (legacy — now handled by HostProfileService)"""
         status_messages = {
             'approved': 'Congratulations! Your host profile has been approved.',
             'rejected': 'Unfortunately, your host profile has been rejected.',

@@ -1,7 +1,10 @@
 from django.conf import settings
 from django.core.mail import send_mail
 
-from .aws_utils import publish_to_sqs  # adjust import path if needed
+from accounts.infrastructure.notification_gateway import get_notification_gateway
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 def send_app_email(
@@ -20,7 +23,7 @@ def send_app_email(
         - Uses Django send_mail (console or SMTP based on EMAIL_BACKEND)
 
     Non-local:
-        - Publishes email payload to SQS for async processing
+        - Publishes email to SNS for processing by eygarnotification service
 
     Parameters
     ----------
@@ -35,32 +38,27 @@ def send_app_email(
     from_email : str | None
         Overrides DEFAULT_FROM_EMAIL
     extra_payload : dict | None
-        Additional metadata for SQS consumers
+        Additional metadata for consumers
     """
 
-    payload = {
-        "to": [to_email],
-        "subject": subject,
-        "message": message,
-        "html_message": html_message,
-        "from_email": from_email or settings.DEFAULT_FROM_EMAIL,
-    }
-
-    if extra_payload:
-        payload.update(extra_payload)
-
-    # Local / debug mode → send directly
+    # Local / debug mode → send directly via Django email backend
     if settings.DEBUG and getattr(settings, "ENV", "local") == "local":
         send_mail(
             subject=subject,
             message=message,
-            from_email=payload["from_email"],
+            from_email=from_email or settings.DEFAULT_FROM_EMAIL,
             recipient_list=[to_email],
             html_message=html_message,
             fail_silently=False,
         )
         return {"status": "sent", "mode": "direct"}
 
-    # Non-local → async via SQS
-    publish_to_sqs(payload)
-    return {"status": "queued", "mode": "sqs"}
+    # Non-local → delegate to eygarnotification via SNS
+    gateway = get_notification_gateway()
+    gateway.send_transactional_email(
+        to_email=to_email,
+        subject=subject,
+        message=message,
+        html_message=html_message,
+    )
+    return {"status": "queued", "mode": "sns"}

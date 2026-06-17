@@ -8,15 +8,15 @@ import logging
 from accounts.domain.events import HostProfileCreated, HostProfileVerified
 from accounts.domain.notification_templates import NotificationTemplate
 from accounts.infrastructure.notification_gateway import get_notification_gateway
-from accounts.infrastructure.sns_publisher import get_sns_publisher
+from accounts.infrastructure.sqs_publisher import get_sqs_publisher
 
 logger = logging.getLogger(__name__)
 
 
 class HostProfileService:
 
-    def __init__(self, sns_publisher=None, notification_gateway=None):
-        self.sns = sns_publisher or get_sns_publisher()
+    def __init__(self, sqs_publisher=None, notification_gateway=None):
+        self.sqs = sqs_publisher or get_sqs_publisher()
         self.notification = notification_gateway or get_notification_gateway()
 
     def on_profile_submitted(self, eygar_host):
@@ -29,7 +29,7 @@ class HostProfileService:
             host_profile_id=str(eygar_host.id),
             email=eygar_host.user.email,
         )
-        self.sns.publish_event(event)
+        self.sqs.publish_event(event)
 
         # Notify user via eygarnotification
         if eygar_host.user.email:
@@ -68,7 +68,7 @@ class HostProfileService:
             host_profile_id=str(eygar_host.id),
             email=user.email,
         )
-        self.sns.publish_event(event)
+        self.sqs.publish_event(event)
 
         # Notify user
         if user.email:

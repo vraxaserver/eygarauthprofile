@@ -35,7 +35,7 @@ class SocialAuthServiceTest(TestCase):
 
     def setUp(self):
         self.mock_sns = MagicMock()
-        self.service = SocialAuthService(sns_publisher=self.mock_sns)
+        self.service = SocialAuthService(sqs_publisher=self.mock_sns)
 
     @patch('accounts.application.services.social_auth_service.requests.get')
     def test_google_login_creates_new_user(self, mock_get):
@@ -126,7 +126,7 @@ class SocialAuthServiceTest(TestCase):
 
         events = [call[0][0] for call in self.mock_sns.publish_event.call_args_list]
         event_types = [e.event_type for e in events]
-        self.assertIn('UserRegistered', event_types)
+        self.assertIn('UserRegistration', event_types)
         self.assertIn('GuestProfileCreated', event_types)
 
     @patch('accounts.application.services.social_auth_service.requests.get')

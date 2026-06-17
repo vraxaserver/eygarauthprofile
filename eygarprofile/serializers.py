@@ -308,8 +308,18 @@ class VendorProfileSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'user', 'status', 'current_step',
             'company_details_completed', 'service_area_completed', 'contact_details_completed',
-            'company_details', 'service_areas', 'contact_details'
+            'company_details', 'service_areas', 'contact_details', 'user_info'
         ]
+
+    def get_user_info(self, obj):
+        return {
+            'id': obj.user.id,
+            'username': obj.user.username,
+            'avatar': obj.user.avatar.url if obj.user.avatar else None,
+            'email': obj.user.email,
+            'first_name': obj.user.first_name,
+            'last_name': obj.user.last_name,
+        }
 
 
 class EygarProfileSerializer(serializers.ModelSerializer):

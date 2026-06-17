@@ -19,7 +19,7 @@ from accounts.infrastructure.repositories import (
     UserRepository,
     VerificationCodeRepository,
 )
-from accounts.infrastructure.sns_publisher import get_sns_publisher
+from accounts.infrastructure.sqs_publisher import get_sqs_publisher
 from accounts.models import VerificationCode
 
 logger = logging.getLogger(__name__)
@@ -44,12 +44,12 @@ class RegistrationService:
         user_repo=None,
         code_repo=None,
         notification_gateway=None,
-        sns_publisher=None,
+        sqs_publisher=None,
     ):
         self.user_repo = user_repo or UserRepository()
         self.code_repo = code_repo or VerificationCodeRepository()
         self.notification = notification_gateway or get_notification_gateway()
-        self.sns = sns_publisher or get_sns_publisher()
+        self.sqs = sqs_publisher or get_sqs_publisher()
 
     def register(self, dto: RegisterDTO) -> dict:
         """
@@ -112,7 +112,7 @@ class RegistrationService:
             phone_number=user.phone_number,
             otp=code,
         )
-        self.sns.publish_event(event)
+        self.sqs.publish_event(event)
 
         logger.info("User registered: %s (channel=%s)", dto.email_or_phone, channel)
 

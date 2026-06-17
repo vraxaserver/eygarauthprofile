@@ -16,56 +16,7 @@ AWS_REGION_NAME = os.getenv("AWS_REGION_NAME", "us-east-1")
 
 sqs = boto3.client("sqs", region_name=AWS_REGION_NAME)
 
-def publish_to_sns(message_type, payload, message_attributes=None):
-    """
-    Publishes a message to the SNS topic.
 
-    :param message_type: A string to identify the message type (e.g., 'email', 'sms').
-    :param payload: A dictionary with the message details.
-    :param message_attributes: Optional dict of SNS MessageAttributes for filtering.
-    """
-    if not all([settings.AWS_ACCESS_KEY_ID, settings.AWS_SECRET_ACCESS_KEY, settings.AWS_REGION_NAME, settings.SNS_TOPIC_ARN]):
-        # Log an error or handle the case where AWS settings are not configured
-        logger.warning("AWS settings are not fully configured — SNS publish skipped.")
-        return
-
-    sns_client = boto3.client(
-        'sns',
-        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-        region_name=settings.AWS_REGION_NAME
-    )
-
-    message = {
-        'message_type': message_type,
-        'payload': payload
-    }
-
-    # Build SNS MessageAttributes
-    sns_attrs = {
-        'message_type': {
-            'DataType': 'String',
-            'StringValue': message_type,
-        },
-    }
-    if message_attributes:
-        for key, value in message_attributes.items():
-            sns_attrs[key] = {
-                'DataType': 'String',
-                'StringValue': str(value),
-            }
-
-    try:
-        response = sns_client.publish(
-            TopicArn=settings.SNS_TOPIC_ARN,
-            Message=json.dumps(message),
-            MessageAttributes=sns_attrs,
-        )
-        logger.info("Published '%s' to SNS. MessageId=%s", message_type, response.get('MessageId'))
-        return response
-    except Exception as e:
-        logger.exception("Error publishing to SNS: %s", e)
-        return None
 
 
 def publish_to_sqs(email):

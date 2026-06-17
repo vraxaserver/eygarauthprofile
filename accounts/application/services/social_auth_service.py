@@ -17,7 +17,7 @@ from accounts.infrastructure.repositories import (
     SocialAccountRepository,
     UserRepository,
 )
-from accounts.infrastructure.sns_publisher import get_sns_publisher
+from accounts.infrastructure.sqs_publisher import get_sqs_publisher
 
 logger = logging.getLogger(__name__)
 
@@ -33,12 +33,12 @@ class SocialAuthService:
         user_repo=None,
         profile_repo=None,
         social_repo=None,
-        sns_publisher=None,
+        sqs_publisher=None,
     ):
         self.user_repo = user_repo or UserRepository()
         self.profile_repo = profile_repo or GuestProfileRepository()
         self.social_repo = social_repo or SocialAccountRepository()
-        self.sns = sns_publisher or get_sns_publisher()
+        self.sqs = sqs_publisher or get_sqs_publisher()
 
     def authenticate(self, dto: SocialAuthDTO) -> dict:
         """
@@ -123,14 +123,14 @@ class SocialAuthService:
 
         # Publish events for new users
         if is_new_user:
-            self.sns.publish_event(UserRegistered(
+            self.sqs.publish_event(UserRegistered(
                 user_id=str(user.id),
                 email=user.email,
                 phone_number=user.phone_number,
             ))
 
             if guest_profile:
-                self.sns.publish_event(GuestProfileCreated(
+                self.sqs.publish_event(GuestProfileCreated(
                     user_id=str(user.id),
                     guest_profile_id=str(guest_profile.id),
                     email=user.email,

@@ -23,19 +23,19 @@ class NotificationGatewayTest(TestCase):
 
     def setUp(self):
         self.mock_client = MagicMock()
-        self.mock_client.publish.return_value = {'MessageId': 'msg-123'}
+        self.mock_client.send_message.return_value = {'MessageId': 'msg-123'}
 
-        self.gateway = NotificationGateway(topic_arn='arn:aws:sns:us-east-1:000:notifications')
+        self.gateway = NotificationGateway(queue_url='https://sqs.us-east-1.amazonaws.com/000/test-queue')
         self.gateway._client = self.mock_client
 
     # --- Helpers ---
 
     def _get_published_envelope(self) -> dict:
-        call_kwargs = self.mock_client.publish.call_args[1]
-        return json.loads(call_kwargs['Message'])
+        call_kwargs = self.mock_client.send_message.call_args[1]
+        return json.loads(call_kwargs['MessageBody'])
 
     def _get_published_attributes(self) -> dict:
-        call_kwargs = self.mock_client.publish.call_args[1]
+        call_kwargs = self.mock_client.send_message.call_args[1]
         return call_kwargs['MessageAttributes']
 
     # --- Payload structure tests ---
@@ -85,7 +85,7 @@ class NotificationGatewayTest(TestCase):
             code='123456', purpose='registration',
         )
 
-        self.mock_client.publish.assert_called_once()
+        self.mock_client.send_message.assert_called_once()
         envelope = self._get_published_envelope()
         self.assertEqual(envelope['notification']['template'], 'SIGNUP_OTP')
         self.assertEqual(envelope['notification']['channels'], ['EMAIL'])
@@ -220,18 +220,17 @@ class NotificationGatewayTest(TestCase):
     # --- Edge cases ---
 
     def test_no_direct_twilio_or_sendgrid_calls(self):
-        """Ensure the gateway only publishes to SNS, not calling SMS/email APIs directly."""
+        """Ensure the gateway only publishes to SQS, not calling SMS/email APIs directly."""
         self.gateway.send_verification_code(
             channel='phone', recipient='+1234567890', code='123456',
         )
-        self.mock_client.publish.assert_called_once()
+        self.mock_client.send_message.assert_called_once()
 
     @override_settings(
-        SNS_NOTIFICATION_TOPIC_ARN=None,
-        SNS_TOPIC_ARN=None,
+        AWS_SQS_QUEUE_URL=None,
     )
-    def test_handles_missing_topic_arn(self):
-        gateway = NotificationGateway(topic_arn=None)
+    def test_handles_missing_queue_url(self):
+        gateway = NotificationGateway(queue_url=None)
         result = gateway.send_verification_code(
             channel='email', recipient='test@example.com', code='123456',
         )
@@ -251,7 +250,7 @@ class NotificationGatewayTest(TestCase):
         )
         self.gateway.send_notification(envelope)
 
-        self.mock_client.publish.assert_called_once()
+        self.mock_client.send_message.assert_called_once()
         published = self._get_published_envelope()
         self.assertEqual(published['notification']['template'], 'BOOKING_CONFIRMATION')
         self.assertEqual(published['notification']['channels'], ['SMS', 'EMAIL'])

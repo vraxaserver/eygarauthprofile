@@ -27,7 +27,7 @@ class ForgotPasswordTest(TestCase):
         self.mock_sns = MagicMock()
         self.service = PasswordService(
             notification_gateway=self.mock_notification,
-            sns_publisher=self.mock_sns,
+            sqs_publisher=self.mock_sns,
         )
 
     def test_forgot_password_with_email(self):
@@ -91,7 +91,7 @@ class ResetPasswordTest(TestCase):
         self.mock_sns = MagicMock()
         self.service = PasswordService(
             notification_gateway=self.mock_notification,
-            sns_publisher=self.mock_sns,
+            sqs_publisher=self.mock_sns,
         )
 
     def test_reset_password_success(self):

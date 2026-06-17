@@ -42,7 +42,7 @@ class RegistrationServiceTest(TestCase):
         self.mock_sns = MagicMock()
         self.service = RegistrationService(
             notification_gateway=self.mock_notification,
-            sns_publisher=self.mock_sns,
+            sqs_publisher=self.mock_sns,
         )
 
     def test_register_with_valid_email(self):
@@ -148,7 +148,7 @@ class RegistrationServiceTest(TestCase):
 
         call_args = self.mock_sns.publish_event.call_args
         event = call_args[0][0]
-        self.assertEqual(event.event_type, 'UserRegistered')
+        self.assertEqual(event.event_type, 'UserRegistration')
         self.assertEqual(event.email, 'event@example.com')
 
     def test_register_sends_verification_code_notification(self):

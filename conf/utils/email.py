@@ -22,8 +22,8 @@ def send_app_email(
     Local / DEBUG:
         - Uses Django send_mail (console or SMTP based on EMAIL_BACKEND)
 
-    Non-local:
-        - Publishes email to SNS for processing by eygarnotification service
+    # Non-local:
+        - Publishes email to SQS for processing by eygarnotification service
 
     Parameters
     ----------
@@ -53,7 +53,7 @@ def send_app_email(
         )
         return {"status": "sent", "mode": "direct"}
 
-    # Non-local → delegate to eygarnotification via SNS
+    # Non-local → delegate to eygarnotification via SQS
     gateway = get_notification_gateway()
     gateway.send_transactional_email(
         to_email=to_email,
@@ -61,4 +61,4 @@ def send_app_email(
         message=message,
         html_message=html_message,
     )
-    return {"status": "queued", "mode": "sns"}
+    return {"status": "queued", "mode": "sqs"}

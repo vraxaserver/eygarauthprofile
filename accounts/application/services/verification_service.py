@@ -22,7 +22,7 @@ from accounts.infrastructure.repositories import (
     UserRepository,
     VerificationCodeRepository,
 )
-from accounts.infrastructure.sns_publisher import get_sns_publisher
+from accounts.infrastructure.sqs_publisher import get_sqs_publisher
 from accounts.models import VerificationCode
 
 logger = logging.getLogger(__name__)
@@ -36,13 +36,13 @@ class VerificationService:
         code_repo=None,
         profile_repo=None,
         notification_gateway=None,
-        sns_publisher=None,
+        sqs_publisher=None,
     ):
         self.user_repo = user_repo or UserRepository()
         self.code_repo = code_repo or VerificationCodeRepository()
         self.profile_repo = profile_repo or GuestProfileRepository()
         self.notification = notification_gateway or get_notification_gateway()
-        self.sns = sns_publisher or get_sns_publisher()
+        self.sqs = sqs_publisher or get_sqs_publisher()
 
     def verify_code(self, dto: VerifyCodeDTO) -> dict:
         """
@@ -107,7 +107,7 @@ class VerificationService:
                 email=user.email,
                 phone=user.phone_number,
             )
-            self.sns.publish_event(event)
+            self.sqs.publish_event(event)
 
         # Check if fully verified (both email and phone)
         if user.is_fully_verified:
@@ -118,7 +118,7 @@ class VerificationService:
                 email_verified=user.is_email_verified,
                 phone_verified=user.is_phone_verified,
             )
-            self.sns.publish_event(event)
+            self.sqs.publish_event(event)
 
         logger.info("User verified: %s", dto.email_or_phone)
 
@@ -173,7 +173,7 @@ class VerificationService:
                 email_verified=user.is_email_verified,
                 phone_verified=user.is_phone_verified,
             )
-            self.sns.publish_event(event)
+            self.sqs.publish_event(event)
 
         return {
             'user_id': str(user.id),

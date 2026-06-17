@@ -24,9 +24,7 @@ PASSWORD_HASHERS = [
 AWS_ACCESS_KEY_ID = 'test-key'
 AWS_SECRET_ACCESS_KEY = 'test-secret'
 AWS_REGION_NAME = 'us-east-1'
-SNS_TOPIC_ARN = 'arn:aws:sns:us-east-1:000000000000:test-topic'
-SNS_AUTH_EVENTS_TOPIC_ARN = SNS_TOPIC_ARN
-SNS_NOTIFICATION_TOPIC_ARN = SNS_TOPIC_ARN
+AWS_SQS_QUEUE_URL = 'https://sqs.us-east-1.amazonaws.com/000000000000/test-queue'
 AWS_S3_BUCKET_NAME = 'test-bucket'
 
 # Social auth test credentials

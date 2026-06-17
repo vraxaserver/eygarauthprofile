@@ -17,7 +17,7 @@ class HostProfileServiceTest(TestCase):
         self.mock_sns = MagicMock()
         self.mock_notification = MagicMock()
         self.service = HostProfileService(
-            sns_publisher=self.mock_sns,
+            sqs_publisher=self.mock_sns,
             notification_gateway=self.mock_notification,
         )
 
@@ -89,8 +89,8 @@ class HostProfileServiceTest(TestCase):
         event = self.mock_sns.publish_event.call_args[0][0]
         self.assertEqual(event.event_type, 'HostProfileVerified')
 
-    def test_notifications_via_sns_not_direct_email(self):
-        """Verify that all notifications go through the NotificationGateway (SNS),
+    def test_notifications_via_sqs_not_direct_email(self):
+        """Verify that all notifications go through the NotificationGateway (SQS),
         not through direct email sending."""
         user = create_active_user(email='snsonly@example.com')
         host = EygarHost.objects.create(user=user, status='submitted')

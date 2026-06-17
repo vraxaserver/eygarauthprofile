@@ -22,7 +22,7 @@ from accounts.domain.exceptions import (
 )
 from accounts.infrastructure.notification_gateway import get_notification_gateway
 from accounts.infrastructure.repositories import UserRepository
-from accounts.infrastructure.sns_publisher import get_sns_publisher
+from accounts.infrastructure.sqs_publisher import get_sqs_publisher
 from accounts.models import PasswordResetToken
 
 logger = logging.getLogger(__name__)
@@ -34,11 +34,11 @@ class PasswordService:
         self,
         user_repo=None,
         notification_gateway=None,
-        sns_publisher=None,
+        sqs_publisher=None,
     ):
         self.user_repo = user_repo or UserRepository()
         self.notification = notification_gateway or get_notification_gateway()
-        self.sns = sns_publisher or get_sns_publisher()
+        self.sqs = sqs_publisher or get_sqs_publisher()
 
     def forgot_password(self, dto: ForgotPasswordDTO) -> dict:
         """
@@ -84,7 +84,7 @@ class PasswordService:
             channel=identifier_type,
             otp=code,
         )
-        self.sns.publish_event(event)
+        self.sqs.publish_event(event)
 
         logger.info("Password reset requested for %s", dto.email_or_phone)
 

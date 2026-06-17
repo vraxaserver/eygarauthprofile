@@ -71,15 +71,14 @@ def _template_to_event_type(template: str) -> str:
 
 class NotificationGateway:
     """
-    Publishes notification-request events to an SNS topic
+    Publishes notification-request events to an SQS queue
     that the eygarnotification service subscribes to.
     """
 
-    def __init__(self, topic_arn: str | None = None):
-        self._topic_arn = (
-            topic_arn
-            or getattr(settings, 'SNS_NOTIFICATION_TOPIC_ARN', None)
-            or getattr(settings, 'SNS_TOPIC_ARN', None)
+    def __init__(self, queue_url: str | None = None):
+        self._queue_url = (
+            queue_url
+            or getattr(settings, 'AWS_SQS_QUEUE_URL', None)
         )
         self._client = None
 
@@ -87,7 +86,7 @@ class NotificationGateway:
     def client(self):
         if self._client is None:
             self._client = boto3.client(
-                'sns',
+                'sqs',
                 aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
                 aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
                 region_name=settings.AWS_REGION_NAME,
@@ -98,23 +97,23 @@ class NotificationGateway:
 
     def _publish(self, envelope: NotificationEnvelope) -> dict | None:
         """
-        Serialise a NotificationEnvelope and publish to SNS.
+        Serialise a NotificationEnvelope and publish to SQS.
 
         Sets MessageAttributes for event_type and template so the
-        Notification Service can use SNS subscription filter policies.
+        Notification Service can use SQS message attributes.
         """
-        if not self._topic_arn:
+        if not self._queue_url:
             logger.warning(
-                "SNS notification topic ARN not configured — '%s/%s' not sent.",
+                "SQS notification queue URL not configured — '%s/%s' not sent.",
                 envelope.event_type,
                 envelope.notification.template,
             )
             return None
 
         try:
-            response = self.client.publish(
-                TopicArn=self._topic_arn,
-                Message=json.dumps(envelope.to_dict()),
+            response = self.client.send_message(
+                QueueUrl=self._queue_url,
+                MessageBody=json.dumps(envelope.to_dict()),
                 MessageAttributes={
                     'event_type': {
                         'DataType': 'String',
@@ -127,7 +126,7 @@ class NotificationGateway:
                 },
             )
             logger.info(
-                "Published notification '%s' (template=%s) to SNS. MessageId=%s",
+                "Published notification '%s' (template=%s) to SQS. MessageId=%s",
                 envelope.event_type,
                 envelope.notification.template,
                 response.get('MessageId'),
@@ -135,7 +134,7 @@ class NotificationGateway:
             return response
         except Exception:
             logger.exception(
-                "Failed to publish notification '%s' (template=%s) to SNS.",
+                "Failed to publish notification '%s' (template=%s) to SQS.",
                 envelope.event_type,
                 envelope.notification.template,
             )

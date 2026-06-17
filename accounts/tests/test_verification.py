@@ -26,7 +26,7 @@ class VerifyCodeTest(TestCase):
         self.mock_sns = MagicMock()
         self.service = VerificationService(
             notification_gateway=self.mock_notification,
-            sns_publisher=self.mock_sns,
+            sqs_publisher=self.mock_sns,
         )
 
     def test_verify_correct_code_activates_user(self):
@@ -151,7 +151,7 @@ class ResendCodeTest(TestCase):
         self.mock_sns = MagicMock()
         self.service = VerificationService(
             notification_gateway=self.mock_notification,
-            sns_publisher=self.mock_sns,
+            sqs_publisher=self.mock_sns,
         )
 
     def test_resend_creates_new_code(self):

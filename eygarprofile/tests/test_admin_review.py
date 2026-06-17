@@ -18,7 +18,7 @@ class AdminReviewTest(TestCase):
         self.mock_sns = MagicMock()
         self.mock_notification = MagicMock()
         self.service = HostProfileService(
-            sns_publisher=self.mock_sns,
+            sqs_publisher=self.mock_sns,
             notification_gateway=self.mock_notification,
         )
 

@@ -48,7 +48,6 @@ def upload_fileobj_to_s3(file_obj, key_prefix="avatars/"):
     ext = os.path.splitext(file_obj.name)[1] or ""
     key = f"{key_prefix}{uuid.uuid4().hex}{ext}"
     extra_args = {
-        "ACL": "public-read",               # public: quick & easy — consider CloudFront or presigned URLs for production
         "ContentType": getattr(file_obj, "content_type", "application/octet-stream"),
     }
 

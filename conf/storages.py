@@ -28,7 +28,6 @@ class S3MediaStorage(Storage):
         'content' is the file object itself.
         """
         extra_args = {
-            "ACL": "public-read",
             "ContentType": getattr(content, "content_type", "application/octet-stream"),
         }
 

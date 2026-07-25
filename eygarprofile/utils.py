@@ -194,11 +194,10 @@ def send_email_verification(email: str, verification_token: str) -> bool:
         """
         
         send_app_email(
-            subject,
-            message,
-            settings.DEFAULT_FROM_EMAIL,
-            [email],
-            fail_silently=False,
+            subject=subject,
+            message=message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to_email=email,
         )
         
         return True

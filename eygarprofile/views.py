@@ -580,9 +580,9 @@ class AdminReviewViewSet(ViewSet):
         """
 
         send_app_email(
-            subject,
-            message,
-            settings.DEFAULT_FROM_EMAIL,
+            subject=subject,
+            message=message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
             to_email=profile.user.email,
         )
 
@@ -817,9 +817,9 @@ class VendorProfileViewSet(ModelViewSet):
         The Review Team
         """
         send_app_email(
-            subject,
-            message,
-            settings.DEFAULT_FROM_EMAIL,
+            subject=subject,
+            message=message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
             to_email=profile.user.email,
         )
 

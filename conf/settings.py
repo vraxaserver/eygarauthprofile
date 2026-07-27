@@ -165,7 +165,7 @@ SIMPLE_JWT = {
 
 # CORS Configuration
 CORS_ALLOWED_ORIGINS = [
-    "https://dev.eygar.com",
+    "https://eygar.org",
     "http://localhost:3000",  # Next.js default
     "http://127.0.0.1:3000",
 ]

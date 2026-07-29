@@ -4,6 +4,9 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: eygarauth
+    volumes:
+      - ./staticfiles:/app/staticfiles
+      - ./media:/app/media
     env_file:
       - ./.env
     environment:
@@ -15,7 +18,3 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
-
-volumes:
-  static_data:
-  media_data:

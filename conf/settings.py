@@ -118,13 +118,15 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
-STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATIC_ROOT = os.getenv('STATIC_ROOT', default=BASE_DIR / 'staticfiles') 
 
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static'),
 ]
 
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_URL = "/media/"
+
+MEDIA_ROOT = os.getenv('MEDIA_ROOT', default=BASE_DIR / 'media')
 
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
@@ -166,6 +168,7 @@ SIMPLE_JWT = {
 # CORS Configuration
 CORS_ALLOWED_ORIGINS = [
     "https://eygar.org",
+    "https://admin.eygar.org",
     "http://localhost:3000",  # Next.js default
     "http://127.0.0.1:3000",
 ]

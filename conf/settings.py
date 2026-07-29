@@ -16,7 +16,21 @@ STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', default='your-secret-key-here
 DEBUG = os.getenv('DEBUG', default=True)
 
 
-ALLOWED_HOSTS = ['*']
+# ALLOWED_HOSTS = ['*']
+
+ALLOWED_HOSTS = [
+    "eygar.org",
+    "www.eygar.org",
+    "admin.eygar.org",
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://eygar.org",
+    "https://www.eygar.org",
+    "https://admin.eygar.org",
+]
+
+
 
 # Application definition
 

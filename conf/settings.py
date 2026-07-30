@@ -16,18 +16,20 @@ STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', default='your-secret-key-here
 DEBUG = os.getenv('DEBUG', default=True)
 
 
-# ALLOWED_HOSTS = ['*']
-
-ALLOWED_HOSTS = [
-    "eygar.org",
-    "www.eygar.org",
-    "admin.eygar.org",
-]
+DEFAULT_HOSTS = ["eygar.org", ".eygar.org", "www.eygar.org", "admin.eygar.org", "localhost", "127.0.0.1", "*"]
+ALLOWED_HOSTS_ENV = os.getenv("ALLOWED_HOSTS", "")
+if ALLOWED_HOSTS_ENV:
+    ALLOWED_HOSTS = list(set([h.strip() for h in ALLOWED_HOSTS_ENV.split(",") if h.strip()] + DEFAULT_HOSTS))
+else:
+    ALLOWED_HOSTS = DEFAULT_HOSTS
 
 CSRF_TRUSTED_ORIGINS = [
     "https://eygar.org",
+    "https://*.eygar.org",
     "https://www.eygar.org",
     "https://admin.eygar.org",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
 ]
 
 
@@ -182,9 +184,14 @@ SIMPLE_JWT = {
 # CORS Configuration
 CORS_ALLOWED_ORIGINS = [
     "https://eygar.org",
+    "https://www.eygar.org",
     "https://admin.eygar.org",
     "http://localhost:3000",  # Next.js default
     "http://127.0.0.1:3000",
+]
+
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://.*\.eygar\.org$",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
